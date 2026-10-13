@@ -11,7 +11,7 @@ var (
 	scriptWritesGo         = lazy(`(?is)(\.go['"]\s*,\s*['"][wax]|\.go['"]\s*\)\s*\.\s*write|writeFileSync\s*\(\s*['"][^'"\r\n]*\.go['"]|Set-Content[^\r\n]{0,60}\.go['"]|['"][^'"\r\n]*\.go['"][^\r\n]{0,40}\bmode\s*=\s*['"][wax])`)
 	scriptOpensForWrite    = lazy(`(?is)\bopen\s*\([^)\r\n]{0,120},\s*['"][wax]`)
 	goWord                 = lazy(`(?i)\.go\b`)
-	shellWritesSource      = lazy(`(?i)(>>?\s*\S+\.(go|ya?ml|json)\b|\btee\s+(-a\s+)?\S+\.(go|ya?ml|json)\b|\bsed\s+-i\b[^|]*\.(go|ya?ml|json)\b|\b(cp|mv)\s+\S+\s+\S*\.(go|ya?ml|json)\b)`)
+	shellWritesSource      = lazy(`(?i)((^|[;&|(\n]|\$\()\s*((echo|printf|cat)\b[^;&|\n]*)?>>?\s*\S+\.(go|ya?ml|json)\b|\btee\s+(-a\s+)?\S+\.(go|ya?ml|json)\b|\bsed\s+-i\b[^|]*\.(go|ya?ml|json)\b|\b(cp|mv)\s+\S+\s+\S*\.(go|ya?ml|json)\b)`)
 	gitChangesTree         = lazy(`(?i)\bgit\s+(reset|checkout|restore|clean|stash|revert|merge|rebase|switch|add|commit|rm|mv|push|pull|filter-branch|gc|prune|update-ref|branch\s+-[dD]|tag\s+-d)\b`)
 	gitDiscardsWork        = lazy(`(?i)\bgit\s+(reset\s+(--hard|--merge|--keep)|checkout\s+(--|\.)|restore\b|clean\s+-[a-z]*[fdx]|filter-branch|update-ref)`)
 	gitStash               = lazy(`(?i)\bgit\s+stash\b`)

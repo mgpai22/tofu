@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -13,22 +14,38 @@ import (
 	"tofu/internal/subagent"
 )
 
+type BudgetRefusal string
+
+const (
+	RefusedShellSource BudgetRefusal = "shell"
+	RefusedSecondSlice BudgetRefusal = "slice"
+	RefusedOverLines   BudgetRefusal = "lines"
+)
+
 type SourceBudgetError struct {
-	Tool       string
-	Path       string
-	Lines      int
-	Spent      int
-	Spawn      []string
-	ShellWrite bool
+	Tool   string
+	Path   string
+	Lines  int
+	Spent  int
+	Slice  string
+	Spawn  []string
+	Reason BudgetRefusal
 }
 
 func (e SourceBudgetError) Error() string {
-	if e.ShellWrite {
-		return fmt.Sprintf("%s: %s is source code, and the orchestrator never writes source through the shell: use edit for a fix of up to %d lines, or spawn %s with this work",
-			e.Tool, e.Path, konst.OrchestratorSourceLinesPerTurn, strings.Join(e.Spawn, " or "))
+	spawn := strings.Join(e.Spawn, " or ")
+	switch e.Reason {
+	case RefusedShellSource:
+		return fmt.Sprintf("%s: %s is source code written by hand through the shell, which the orchestrator never does: use edit or write within your budget of %d lines in one directory, or spawn %s. a rename across files goes through the language's own rename or rewrite tool, and a program's own output redirected into a file, such as a generator or a schema printer, is not counted and runs",
+			e.Tool, e.Path, konst.OrchestratorSourceLinesPerTurn, spawn)
+	case RefusedSecondSlice:
+		return fmt.Sprintf("%s: %s is source in a second directory, and this turn already changed source in %s: work in one directory is yours, a second is a separate piece, so spawn %s with it",
+			e.Tool, e.Path, e.Slice, spawn)
+	case RefusedOverLines:
+		return fmt.Sprintf("%s: %s is source code, and this change of %d lines would pass the orchestrator's budget of %d changed source lines in one turn, %d of which are spent: spawn %s with this work instead",
+			e.Tool, e.Path, e.Lines, konst.OrchestratorSourceLinesPerTurn, e.Spent, spawn)
 	}
-	return fmt.Sprintf("%s: %s is source code, and this change of %d lines would pass the orchestrator's budget of %d changed source lines in one turn, %d of which are spent: spawn %s with this work instead",
-		e.Tool, e.Path, e.Lines, konst.OrchestratorSourceLinesPerTurn, e.Spent, strings.Join(e.Spawn, " or "))
+	panic("tofu: unknown source budget refusal " + string(e.Reason))
 }
 
 func sourceLanguage(path string) string {
@@ -46,8 +63,24 @@ func linesIn(text string) int {
 	return strings.Count(strings.TrimSuffix(text, "\n"), "\n") + 1
 }
 
+func handWrittenSource(command string) (string, error) {
+	if _, err := subagent.ShellWrites(command); err != nil {
+		return "", err
+	}
+	for _, step := range subagent.ShellSteps(command) {
+		if !slices.Contains([]string{"", "echo", "printf", "cat", "tee", "sed", "perl", "cp", "mv"}, step.Program) {
+			continue
+		}
+		if at := slices.IndexFunc(step.Changes, func(path string) bool { return sourceLanguage(path) != "" }); at >= 0 {
+			return step.Changes[at], nil
+		}
+	}
+	return "", nil
+}
+
 type sourceBudget struct {
 	spent   int
+	slice   string
 	enabled []subagent.Definition
 }
 
@@ -71,9 +104,25 @@ func (t budgetedTool) Name() string { return t.tool.Name() }
 
 func (t budgetedTool) Definition() llm.Tool {
 	definition := t.tool.Definition()
-	definition.Description += fmt.Sprintf(". as the orchestrator you change at most %d lines of source code in one turn, through write and edit only, and never write source through the shell; "+
-		"markdown, notes, plans, configuration and data are free, and past the budget a source write is refused and goes to a sub-agent", konst.OrchestratorSourceLinesPerTurn)
+	definition.Description += fmt.Sprintf(". as the orchestrator you change source code yourself, through write and edit, when the work stays in one directory and within %d changed lines in one turn: "+
+		"do that work without spawning. source in a second directory, or past the lines, is refused and goes to a sub-agent. never write source by hand through the shell, sed -i and a heredoc included: "+
+		"a rename across files goes through the language's own rename or rewrite tool, which is a program and runs, and a program's own output redirected into a file is not counted. read every file you will change with the read tool first, in one call: a file a shell command printed was not read, and edit and write refuse it. "+
+		"markdown, notes, plans, configuration and data are free", konst.OrchestratorSourceLinesPerTurn)
 	return definition
+}
+
+func (t budgetedTool) refuse(refusal SourceBudgetError) SourceBudgetError {
+	language := sourceLanguage(refusal.Path)
+	for _, definition := range t.budget.enabled {
+		if definition.Language == language {
+			refusal.Spawn = append(refusal.Spawn, definition.Name)
+		}
+	}
+	if len(refusal.Spawn) == 0 {
+		refusal.Spawn = []string{"a sub-agent"}
+	}
+	refusal.Tool, refusal.Spent, refusal.Slice = t.Name(), t.budget.spent, t.budget.slice
+	return refusal
 }
 
 func (t budgetedTool) Run(ctx context.Context, raw json.RawMessage) (Result, error) {
@@ -87,37 +136,32 @@ func (t budgetedTool) Run(ctx context.Context, raw json.RawMessage) (Result, err
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return t.tool.Run(ctx, raw)
 	}
-	lines, shellWrite := max(linesIn(args.Content), linesIn(args.Old), linesIn(args.New)), false
 	if t.Name() == "bash" {
-		written, err := subagent.ShellWrites(args.Command)
+		written, err := handWrittenSource(args.Command)
 		if err != nil {
 			return Result{}, fmt.Errorf("%s: %w", t.Name(), err)
 		}
-		for _, path := range written {
-			if sourceLanguage(path) != "" {
-				args.Path, shellWrite = path, true
-			}
+		if written != "" {
+			return Result{}, t.refuse(SourceBudgetError{Path: written, Reason: RefusedShellSource})
 		}
 	}
-	language := sourceLanguage(args.Path)
-	if language == "" {
+	if sourceLanguage(args.Path) == "" {
 		return t.tool.Run(ctx, raw)
 	}
-	if shellWrite || t.budget.spent+lines > konst.OrchestratorSourceLinesPerTurn {
-		refusal := SourceBudgetError{Tool: t.Name(), Path: args.Path, Lines: lines, Spent: t.budget.spent, ShellWrite: shellWrite}
-		for _, definition := range t.budget.enabled {
-			if definition.Language == language {
-				refusal.Spawn = append(refusal.Spawn, definition.Name)
-			}
-		}
-		if len(refusal.Spawn) == 0 {
-			refusal.Spawn = []string{"a sub-agent"}
-		}
-		return Result{}, refusal
+	lines := max(linesIn(args.Content), linesIn(args.Old), linesIn(args.New))
+	slice, err := filepath.Abs(filepath.Dir(args.Path))
+	if err != nil {
+		return Result{}, fmt.Errorf("%s: %w", t.Name(), err)
+	}
+	switch {
+	case t.budget.slice != "" && t.budget.slice != slice:
+		return Result{}, t.refuse(SourceBudgetError{Path: args.Path, Lines: lines, Reason: RefusedSecondSlice})
+	case t.budget.spent+lines > konst.OrchestratorSourceLinesPerTurn:
+		return Result{}, t.refuse(SourceBudgetError{Path: args.Path, Lines: lines, Reason: RefusedOverLines})
 	}
 	result, err := t.tool.Run(ctx, raw)
 	if err == nil && result.FailureText == "" {
-		t.budget.spent += lines
+		t.budget.spent, t.budget.slice = t.budget.spent+lines, slice
 	}
 	return result, err
 }

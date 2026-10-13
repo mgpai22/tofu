@@ -46,15 +46,17 @@ needs context. Its findings are sorted into act on, consider, noted, and
 dismissed. The lead checks the work and answers you.
 ```
 
-## Why the lead does not write
+## When the lead writes and when it spawns
 
 Claude Code and Codex are general agents: the orchestrator, the sub-agents
 and their rules are yours to build. tofu is a coding harness that brings
 them.
 
-**The lead keeps its context for you.** It may change at most 10 lines of
-source in a turn. A bigger write is refused, and the refusal names the
-sub-agent to spawn.
+**The lead does one small piece itself.** Work that stays in one directory
+and within the lead's budget of changed source lines is the lead's: it edits,
+checks and answers without spawning. Source in a second directory, or past the
+budget, is refused, and the refusal names the sub-agent to spawn. A program's
+own output redirected into a file, such as a schema printer, is not counted.
 
 **Each sub-agent starts clean**, with only the rules for its own piece. A
 sub-agent that writes Go never reads the React rules. Against the same agents
@@ -152,8 +154,10 @@ its logs, captures and probes. It writes and deletes there with no paths held
 and no ask, and nothing it writes there reaches the repository. See
 [Scratchpad](/docs/features/scratchpad).
 
-With `projectManagement` set to `boardy`, the lead spawns a sub-agent with
-`ticket: DEMO-2` rather than owns: the ticket's owns become its paths, the
+With `projectManagement` set to `boardy` and a board in the project, the lead
+spawns a sub-agent with `ticket: DEMO-2` rather than owns. A project with no
+board gets neither the board rules nor the ticket tools until `tofu boardy
+init` makes one. The ticket's owns become the sub-agent's paths, the
 ticket is assigned to `<session>/DEMO-2` and moves to doing, and the
 sub-agent logs its evidence and moves the ticket to review itself. Every shell
 tofu starts carries `TOFU_SESSION`, so `tofu boardy` run there acts as that
@@ -189,5 +193,5 @@ To run the lead alone: `tofu settings set turnMaySpawn false`.
 | `subAgentDepth` (2) | How deep sub-agents may spawn their own |
 | `subAgentCheckSeconds` (1800) | Seconds between checks on a running sub-agent; 0 sends none |
 | `subAgentWatchSeconds` (600) | Seconds a sub-agent's call runs before its row says what it is doing, and with nothing moving, before it reads stalled |
-| `verifySubAgents` (true) | On: before it calls a sub-agent's work done, the lead reads what the sub-agent changed, runs the build or tests again or opens what it made, and says what it saw. Off: the lead takes a finished report as the result, unless the report says something failed. `tofu rules off verify_sub_agents` also turns it off |
+| `verifySubAgents` (true) | On: a report tofu reads as clean, done with its gate passed after the last edit, is answered from as it stands; for any other, before it calls the work done, the lead reads what the sub-agent changed, runs the build or tests again or opens what it made, and says what it saw. Off: the lead takes a finished report as the result, unless the report says something failed. `tofu rules off verify_sub_agents` also turns it off |
 | `turnMaySpawn` (`true`) | Whether the lead may spawn at all |

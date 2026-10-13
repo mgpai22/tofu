@@ -93,15 +93,20 @@ func TestAFileChangedOnDiskAfterTheReadIsRefused(t *testing.T) {
 	}
 }
 
-func TestARefusalThatPrintsTheWholeFileCountsAsItsRead(t *testing.T) {
+func TestAnExactEditOfASmallFileNeverReadIsApplied(t *testing.T) {
+	absent, absentLedger := sessionDir(t)
+	_, _, guessed := turnTools(t, absent, absentLedger)
+	if err := call(t, guessed, map[string]string{"path": "package.json", "old_string": "nothing like this", "new_string": "inky"}); err == nil {
+		t.Fatal("an edit of a file never read whose old_string is absent was allowed")
+	}
 	dir, ledger := sessionDir(t)
 	_, _, edit := turnTools(t, dir, ledger)
-	args := map[string]string{"path": "package.json", "old_string": "moth", "new_string": "inky"}
-	if err := call(t, edit, args); err == nil {
-		t.Fatal("an edit of a file never read was allowed")
+	if err := call(t, edit, map[string]string{"path": "package.json", "old_string": "moth", "new_string": "inky"}); err != nil {
+		t.Fatalf("an exact edit of a small file never read was refused, a round trip the refusal would undo: %v", err)
 	}
-	if err := call(t, edit, args); err != nil {
-		t.Fatalf("the edit after a refusal that printed the whole file was refused again: %v", err)
+	got, _ := os.ReadFile(filepath.Join(dir, "package.json"))
+	if !strings.Contains(string(got), "inky") {
+		t.Fatalf("package.json is %q", got)
 	}
 }
 

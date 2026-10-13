@@ -38,7 +38,9 @@ The lead also carries tofu's working rules, the same for every project:
 
 | Rule | What the lead does |
 |---|---|
-| `verify_sub_agents` | Checks a sub-agent's work itself before calling it done: reads what changed, runs the build or tests, opens or drives what it made, and says what it saw. The `verifySubAgents` setting switches it |
+| `orchestrate` | Does work in one directory and within its source budget itself, and spawns for a second directory or more lines |
+| `verify_sub_agents` | Answers from a report tofu reads as clean; checks any other sub-agent work itself before calling it done: reads what changed, runs the build or tests, opens or drives what it made, and says what it saw. The `verifySubAgents` setting switches it |
+| `board_lead` | Works from the board's tickets. On with `projectManagement` set to `boardy` in a project that has a board |
 | `brief_from_references` | Opens the file, image, page or message you pointed at before briefing, and quotes it word for word in the brief |
 | `check_as_seen` | Checks visual work in the real window at the size and state your bug needs, and hands you the build it just made, with its path and time |
 | `stay_in_scope` | Changes only what you asked or corrected, and offers anything more instead of doing it |

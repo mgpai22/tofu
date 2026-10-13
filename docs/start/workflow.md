@@ -11,12 +11,15 @@ pieces to sub-agents that run in the background, and you keep talking to it.
 
 ![A task handed to go-dev, running in the background while the chat stays open](./media/tui-task-working.png)
 
-## Why the lead delegates
+## When the lead delegates
 
-The lead keeps its context for the plan and for you, and each sub-agent
-starts clean with only the rules for its piece. A language sub-agent such as
-`go-dev` is sent back until its checks ran after its last edit, and the lead
-reads the diff and runs the checks itself before it answers. With five
+Work in one directory, within the lead's budget of changed source lines, the
+lead does itself: on a five-part task in one Go package it answered in 5
+requests at the median, against 11 when it spawned. Work that spans more
+directories goes to sub-agents, and each starts clean with only the rules
+for its piece. A language sub-agent such as `go-dev` is sent back until its
+checks ran after its last edit. A report tofu reads as clean is answered
+from; any other the lead checks itself before it answers. With five
 sub-agents running at once, a task's first turn took 4 min 58 s, against
 21 min 18 s when none overlapped.
 

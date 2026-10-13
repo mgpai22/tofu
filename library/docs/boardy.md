@@ -76,8 +76,9 @@ The lead's session must manage the board: `tofu boardy manager add
 `TOFU_SESSION`.
 
 The rules `board_lead` and `board_sub_agent` ship off and switch on with
-the setting. With it `off`, no board file is written and no board rule
-reaches a prompt.
+the setting in a project that has a board. With it `off`, or with no board
+yet, no board rule reaches a prompt: `tofu rules list` says `off until the
+project has a board: tofu boardy init`.
 
 ## Check it
 

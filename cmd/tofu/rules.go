@@ -80,6 +80,15 @@ func ruleSetting(id string) string {
 	return ""
 }
 
+func projectHasBoard(project string) bool {
+	store, err := boardy.OpenStore(project)
+	if err != nil {
+		return false
+	}
+	boards, _ := store.Boards()
+	return len(boards) > 0
+}
+
 func ruleSettingOnValue(key string) string {
 	if key == boardy.ManagementSetting {
 		return string(boardy.ManagementBoardy)
@@ -128,7 +137,7 @@ func stackRules(library, project string) (ruleStack, error) {
 		}
 		on := settingInt(project, key, nil) != 0
 		if key == boardy.ManagementSetting {
-			on = settingText(project, key, nil) == string(boardy.ManagementBoardy)
+			on = settingText(project, key, nil) == string(boardy.ManagementBoardy) && projectHasBoard(project)
 		}
 		mode := rule.ModeOff
 		if on {
@@ -286,9 +295,13 @@ func rulesListVerb(args []string, out, errOut io.Writer) int {
 	}
 	for _, off := range stack.shippedOff {
 		switchOn := "ships off: tofu rules restore " + off.ID
-		if key := ruleSetting(off.ID); slices.Contains(stack.bySetting, off.ID) {
+		key := ruleSetting(off.ID)
+		switch {
+		case slices.Contains(stack.bySetting, off.ID):
 			switchOn = "off by the setting " + key + ": tofu settings set " + key + " " + ruleSettingOnValue(key)
-		} else if key != "" {
+		case key == boardy.ManagementSetting && settingText(opts.dir, key, nil) == string(boardy.ManagementBoardy):
+			switchOn = "off until the project has a board: tofu boardy init"
+		case key != "":
 			switchOn += ", or tofu settings set " + key + " " + ruleSettingOnValue(key)
 		}
 		listing = append(listing, ruleListing{ID: off.ID, Kind: string(off.Kind), Origin: shippedFrom, Mode: string(rule.ModeOff), Switch: switchOn})
