@@ -75,6 +75,20 @@ per language.
   about 250, and the shells screen reads only the new end of each log.
 - **Frontends, more**: one `tofu serve` keeps several sessions running at
   once, and sends account and settings changes as they happen.
+- **Decisions in one minute**: a ticket that needs you carries a question
+  with a one-line summary, a plain explanation, options and a
+  recommendation; `tofu boardy catchup` lists them and reads your answers
+  back. See [Boardy](/docs/features/boardy).
+- **Hooks as tofu**: `tofu guard` runs a repository's hook rules and its
+  commit-message check on any OS. See [guard](/docs/cli/guard).
+- **Browser profiles**: an agent browses on its own Chrome profile, logged
+  in once, headless or not. See
+  [Browser profiles](/docs/automation/browser-profiles).
+- **Commands that start a turn**: `/simplify`, `/debug` and `/hunt`.
+- **Inline code asks you**: a sub-agent's `python -c` shows you the exact
+  code before it runs, outside your repository and without your secrets.
+- **Faster**: `tofu version` starts in about 200 ms where it took 320, and
+  the sub-agents screen allocates 1 MB a frame where it took 18.
 
 ## 0.4
 

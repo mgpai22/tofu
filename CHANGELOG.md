@@ -10,6 +10,27 @@ The minor number carries breaking changes, which is what 0.x means, and **there 
 
 ## Unreleased
 
+## 0.5.12 - 2026-10-13
+
+A board that asks the person in one minute, hooks that run as tofu itself, and a faster start.
+
+### Added
+
+- `tofu boardy ask <ticket> --tldr --eli5 --options "a | b" --recommend n --why` puts a question on a ticket, and a ticket reaches the new `needs-decision` status only with one. `tofu boardy catchup` lists every open question with its tldr, plain explanation, options and recommendation, and writes `catchup.md` for the board; the person answers there, and `tofu boardy catchup --answers` logs each answer on its ticket, clears it, and moves the ticket back.
+- `tofu boardy held <path>` names the doing ticket and glob holding a path; `tofu boardy check move` runs the same checks as the move and writes nothing; `tofu boardy list --fields` returns only the named fields; tickets carry `spec` and `size`; a board can ask for a Log of at least N characters before review and a source in every Scope.
+- `tofu guard <rule>` runs a repository's Claude Code hook rules and its git commit-message check in tofu itself, on Windows, Linux and macOS, reading the hook JSON on stdin.
+- `tofu browser profile new|list|login|stop|remove` and the `browserProfile` and `browserHeadless` settings: an agent browses on its own Chrome profile under the tofu home, logged in once, headless or not. With no profile set, the browser extension works as before.
+- `/simplify`, `/debug <symptom>` and `/hunt [where]` start a turn: the last diff with a simplify skill, a debugging skill that reproduces first, and a hunter and a skeptic followed by a referee. `/help` lists every command.
+- A sub-agent's inline code (`python -c`, `node -e`, a heredoc, a script in its scratch folder) asks the person, through the lead, with allow once, deny, always here and never here. The person sees the exact code, its hash and where it runs; it runs from the scratch folder with secret-named variables removed, and the ledger keeps a row for each ask and each run.
+- The rust-dev agent carries the gpui knowledge, and rules can name `framework: gpui-ce` from a Cargo.toml.
+
+### Changed
+
+- Every verb starts faster: `tofu version` in about 200 ms where it took about 320, with 3.3 MB of start-up allocation where it took 7.9.
+- The sub-agents screen allocates about 1 MB a frame while thinking streams, where it allocated 18 MB, with thinking shown or hidden.
+- `shell wait` waits until the command exits, up to five minutes, or until its output holds the `until` text, so one wait covers a long build.
+- A spawn writes how long each step before the sub-agent started took into the lead's trace.
+
 ## 0.5.11-fix2 - 2026-10-13
 
 Forks stop paying for the whole conversation again, and the settings screen gets a Projects section.
