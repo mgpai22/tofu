@@ -79,7 +79,7 @@ func spawnRefusal(root string, source ticketSource, kind, prompt string) (string
 	}
 	known := knownAgentTypes(root)
 	if !slices.ContainsFunc(known, func(name string) bool { return strings.EqualFold(name, cited.Owner) }) {
-		return fmt.Sprintf("%s names owner: %s, which is not a registered agent type. This hook only knows what .claude/agents/ defines, plus orchestrator and general-purpose: %s.", id, cited.Owner, strings.Join(known, ", ")), err
+		return fmt.Sprintf("%s names owner: %s, which is not a registered agent type. This hook only knows what .claude/agents/ and library/*/agents/ define, plus orchestrator and general-purpose: %s.", id, cited.Owner, strings.Join(known, ", ")), err
 	}
 	allowed := []string{cited.Owner}
 	if strings.EqualFold(cited.Owner, "orchestrator") {
@@ -107,6 +107,8 @@ var agentName = lazy(`(?im)^name:\s*(\S+)\s*$`)
 func knownAgentTypes(root string) []string {
 	known := []string{"orchestrator", "general-purpose"}
 	files, _ := filepath.Glob(filepath.Join(root, ".claude", "agents", "*.md"))
+	shipped, _ := filepath.Glob(filepath.Join(root, "library", "*", "agents", "*.md"))
+	files = append(files, shipped...)
 	for _, file := range files {
 		data, _ := os.ReadFile(file)
 		if name := agentName().FindStringSubmatch(string(data)); name != nil {
