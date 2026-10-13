@@ -13,7 +13,7 @@ reaches a prompt only when all of them match:
 | Trigger | Fires when |
 |---|---|
 | `language` | A path the task names is in that language, or the sub-agent declares it |
-| `framework` | A `package.json` the task reaches lists it (`next` counts as `react`, `nuxt` as `vue`) |
+| `framework` | A `package.json` the task reaches lists it (`next` counts as `react`, `nuxt` as `vue`), or a `Cargo.toml` lists `gpui-ce`, by name or through `package = "gpui-ce"`; the reason names which file |
 | `scope` | A named path falls inside the glob |
 | `condition` | The regular expression matches the task |
 | `touches` | For a sub-agent, the regular expression matches its task or a path it owns |

@@ -196,6 +196,26 @@ func TestAWorkspaceMemberReachesGpuiCeThroughTheWorkspaceManifestAboveIt(t *test
 	}
 }
 
+func TestTheReasonNamesTheManifestThatListsTheFramework(t *testing.T) {
+	for _, c := range []struct {
+		declared   string
+		frameworks []string
+		fires      bool
+		why        string
+	}{
+		{"gpui-ce", []string{"gpui-ce"}, true, "a Cargo.toml lists gpui-ce"},
+		{"gpui-ce", nil, false, "no Cargo.toml the task reaches lists gpui-ce"},
+		{"react", []string{"react"}, true, "a package.json lists react"},
+		{"react, gpui-ce", nil, false, "no package.json or Cargo.toml the task reaches lists react or gpui-ce"},
+		{"react, svelte", nil, false, "no package.json the task reaches lists react or svelte"},
+	} {
+		fires, why := frameworkRule(t, c.declared).Trigger.firesFor(Task{Frameworks: c.frameworks})
+		if fires != c.fires || why != c.why {
+			t.Errorf("framework: %s with %v: fires = %v, why %q, want %v, %q", c.declared, c.frameworks, fires, why, c.fires, c.why)
+		}
+	}
+}
+
 func TestACargoManifestAboveTheProjectRootIsNotRead(t *testing.T) {
 	root := project(t, map[string]string{"../Cargo.toml": "[dependencies]\ngpui-ce = \"0.2\"\n", "src/main.rs": "fn main() {}"})
 	frameworks, err := Frameworks(root, []string{"src/main.rs"})

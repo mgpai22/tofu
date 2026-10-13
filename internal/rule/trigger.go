@@ -316,9 +316,9 @@ func (t Trigger) firesFor(task Task) (bool, string) {
 	if t.frameworks != nil {
 		listed := slices.IndexFunc(t.frameworks, func(framework string) bool { return slices.Contains(task.Frameworks, framework) })
 		if listed < 0 {
-			return false, fmt.Sprintf("no package.json the task reaches lists %s", strings.Join(t.frameworks, " or "))
+			return false, fmt.Sprintf("no %s the task reaches lists %s", manifestListing(t.frameworks...), strings.Join(t.frameworks, " or "))
 		}
-		why = append(why, fmt.Sprintf("a package.json lists %s", t.frameworks[listed]))
+		why = append(why, fmt.Sprintf("a %s lists %s", manifestListing(t.frameworks[listed]), t.frameworks[listed]))
 	}
 	if t.verb != VerbNone {
 		if task.Verb != t.verb {

@@ -47,6 +47,19 @@ func knownFrameworks() []string {
 	return slices.Compact(known)
 }
 
+func manifestListing(frameworks ...string) string {
+	var files []string
+	for _, m := range manifests() {
+		for _, framework := range m.frameworkOf {
+			if slices.Contains(frameworks, framework) {
+				files = append(files, m.file)
+				break
+			}
+		}
+	}
+	return strings.Join(files, " or ")
+}
+
 func packageJSONDependencies(data []byte) ([]string, error) {
 	var declared struct {
 		Dependencies     map[string]json.RawMessage `json:"dependencies"`
