@@ -91,6 +91,7 @@ type Host struct {
 	closed    bool
 	running   bool
 	stopped   bool
+	cancelled bool
 	cancel    context.CancelFunc
 	pick      Pick
 	fired     []string
@@ -209,7 +210,7 @@ func (h *Host) Send(pick Pick, task string) bool {
 
 func (h *Host) begin(pick Pick, task string, origin Origin) {
 	ctx, cancel := context.WithCancel(context.Background())
-	h.running, h.stopped, h.cancel, h.turn = true, false, cancel, turn.NewID(h.now())
+	h.running, h.stopped, h.cancelled, h.cancel, h.turn = true, false, false, cancel, turn.NewID(h.now())
 	live := Live{Turn: h.turn, Steering: h.steering.ready, LeadStop: h.stopLead, Answers: h.answers, Origin: origin}
 	go func() {
 		out := h.emitter()
@@ -259,9 +260,15 @@ func (h *Host) Stop() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.cancel != nil {
-		h.stopped = true
+		h.stopped, h.cancelled = true, true
 		h.cancel()
 	}
+}
+
+func (h *Host) Cancelled() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.cancelled
 }
 
 func (h *Host) StopLead() {

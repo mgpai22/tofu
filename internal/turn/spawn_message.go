@@ -158,7 +158,7 @@ func (t *SpawnTool) send(ctx context.Context, to, text, from string) (Result, er
 			return Result{}, fmt.Errorf("message refused: %w", err)
 		}
 	}
-	runCtx, cancel := context.WithCancel(ctx)
+	runCtx, cancel := outlivingTheWave(ctx)
 	held, posted, err := t.Inbox.resume(to, text, t.limits().Running, cancel)
 	if held == nil || err != nil || posted {
 		cancel()

@@ -13,29 +13,31 @@ import (
 )
 
 type namingOrder struct {
-	mu     sync.Mutex
-	turned *sync.Cond
-	calls  []string
-	named  map[string]bool
+	mu    sync.Mutex
+	calls []string
+	named map[string]chan struct{}
 }
 
 func newNamingOrder(calls []string) *namingOrder {
-	order := &namingOrder{calls: calls, named: map[string]bool{}}
-	order.turned = sync.NewCond(&order.mu)
+	order := &namingOrder{calls: calls, named: map[string]chan struct{}{}}
+	for _, call := range calls {
+		order.named[call] = make(chan struct{})
+	}
 	return order
 }
 
-func (o *namingOrder) waitForEarlier(call string) {
+func (o *namingOrder) waitForEarlier(ctx context.Context, call string) error {
 	if o == nil {
-		return
+		return ctx.Err()
 	}
-	o.mu.Lock()
-	defer o.mu.Unlock()
 	for _, earlier := range o.calls[:max(slices.Index(o.calls, call), 0)] {
-		for !o.named[earlier] {
-			o.turned.Wait()
+		select {
+		case <-o.named[earlier]:
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
+	return ctx.Err()
 }
 
 func (o *namingOrder) passed(call string) {
@@ -43,9 +45,23 @@ func (o *namingOrder) passed(call string) {
 		return
 	}
 	o.mu.Lock()
-	o.named[call] = true
-	o.mu.Unlock()
-	o.turned.Broadcast()
+	defer o.mu.Unlock()
+	named, listed := o.named[call]
+	if !listed {
+		return
+	}
+	select {
+	case <-named:
+	default:
+		close(named)
+	}
+}
+
+func (t *SpawnTool) refused(call string) {
+	t.mu.Lock()
+	naming := t.naming
+	t.mu.Unlock()
+	naming.passed(call)
 }
 
 type warmup struct {

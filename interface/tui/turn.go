@@ -35,6 +35,7 @@ const (
 	gateOffUnexplained = "tofu could not open the judge."
 	gateOffHead        = "gate off"
 	stoppingNote       = "stopping the turn"
+	stillStoppingNote  = "the turn has not stopped, so everything it started is stopping too; if it still runs, ctrl+c quits tofu"
 	stoppingModel      = "stopping the model, and letting the running tools finish"
 	queuedKept         = ", and the queue keeps "
 	queuedTyped        = " you typed"
@@ -228,6 +229,13 @@ func (a *App) turnEventID() string {
 }
 
 func (a *App) interrupt() tea.Cmd {
+	if a.stopOverdue() {
+		if a.options.Host.Cancelled() {
+			return tea.Quit
+		}
+		a.stopEverything()
+		return nil
+	}
 	subAgentsRun := a.status.Agents > 0
 	if a.busy && subAgentsRun && (!a.leading || a.view.Stopping) {
 		a.askToStopSubAgents()
@@ -265,7 +273,14 @@ func (a *App) queueTail() string {
 	return queuedKept + strconv.Itoa(held) + word + queuedTyped
 }
 
+func (a *App) stopOverdue() bool {
+	return a.busy && a.view.Stopping && a.options.Now().Sub(a.pressedAt) >= konst.StopSubAgentsMillis*time.Millisecond
+}
+
 func (a *App) stopTurn() {
+	if a.stopOverdue() && !a.options.Host.Cancelled() {
+		a.stopEverything()
+	}
 	if a.view.Stopping {
 		return
 	}
@@ -286,17 +301,21 @@ func (a *App) askToStopSubAgents() {
 }
 
 func (a *App) stopEverything() {
+	note := stillStoppingNote
+	if !a.view.Stopping {
+		a.pressedAt, note = a.options.Now(), stoppingNote
+	}
 	a.view.LettingToolsFinish, a.view.Stopping = false, true
 	a.options.Host.Stop()
 	a.dropSteering()
-	a.noteStop(stoppingNote + a.queueTail())
+	a.noteStop(note + a.queueTail())
 }
 
 func (a *App) stopLead() {
 	if !a.leading {
 		return
 	}
-	a.view.LettingToolsFinish, a.view.Stopping = false, true
+	a.view.LettingToolsFinish, a.view.Stopping, a.pressedAt = false, true, a.options.Now()
 	a.options.Host.StopLead()
 	a.noteStop(stoppingNote + a.queueTail())
 }
@@ -541,6 +560,9 @@ func (a *App) answered(event Event, at time.Time) {
 	a.view.Spawns = len(a.subAgentCalls)
 	status := event.Text
 	finished := a.finish(short(event.ID), event.Text, event.Failed, at)
+	if finished.Kind == feed.KindSpawn && finished.Target == "" && len(event.SubAgents) > 0 {
+		a.spawnedAs(&finished, event.SubAgents[0])
+	}
 	if finished.Kind == feed.KindSpawn && a.view.Stopping {
 		finished.State = feed.StateStopped
 	}
@@ -719,10 +741,18 @@ func settledPrefix(before, now []subagent.Call) int {
 	return settled
 }
 
+func (a *App) spawnedAs(spawn *feed.Event, subAgent subagent.Row) {
+	spawn.Target, spawn.Title = subAgent.Name, subAgent.Doing
+	if spawn.Actor == orchestrator {
+		a.view.Spawned(subAgent.Name)
+		a.reports[subAgent.Name] = ""
+	}
+}
+
 func (a *App) linkSpawns(subAgents []subagent.Row) {
 	turn := a.happened[min(a.happenedAtTurn, len(a.happened)):]
 	unlinked := func(held feed.Event) bool {
-		return held.Kind == feed.KindSpawn && held.State != feed.StateFailed && held.Target == ""
+		return held.Kind == feed.KindSpawn && held.State != feed.StateFailed && held.State != feed.StateStopped && held.Target == ""
 	}
 	if !slices.ContainsFunc(turn, unlinked) {
 		return
@@ -734,7 +764,8 @@ func (a *App) linkSpawns(subAgents []subagent.Row) {
 		}
 	}
 	for _, subAgent := range subAgents {
-		if linked[subAgent.Name] {
+		startedBeforeThisTurn := a.busy && !subAgent.Started.IsZero() && subAgent.Started.Before(turn[0].At)
+		if linked[subAgent.Name] || startedBeforeThisTurn {
 			continue
 		}
 		at := slices.IndexFunc(turn, unlinked)
@@ -742,13 +773,9 @@ func (a *App) linkSpawns(subAgents []subagent.Row) {
 			return
 		}
 		spawn := turn[at]
-		spawn.Target, spawn.Title = subAgent.Name, subAgent.Doing
+		a.spawnedAs(&spawn, subAgent)
 		a.record(spawn)
 		linked[subAgent.Name] = true
-		if spawn.Actor == orchestrator {
-			a.view.Spawned(subAgent.Name)
-			a.reports[subAgent.Name] = ""
-		}
 	}
 }
 

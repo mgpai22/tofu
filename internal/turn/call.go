@@ -66,7 +66,7 @@ type gatedCall struct {
 	gateErr string
 	shadow  <-chan shadowVerdict
 	refusal string
-	fire    func(hook.Input) hook.Verdict
+	fire    func(context.Context, hook.Input) hook.Verdict
 	hooks   []HookRun
 }
 
@@ -80,6 +80,8 @@ func (g gatedCall) run(ctx context.Context, tools Registry, resultBytesCap int, 
 	repeat := false
 	if g.refusal == "" {
 		row, answer, repeat = g.execute(ctx, tools, resultBytesCap, artifacts)
+	} else if spawner, spawning := tools.byName[g.call.Name].(*SpawnTool); spawning {
+		spawner.refused(g.call.ID)
 	}
 	verdict, gateErr := g.verdict, g.gateErr
 	select {
@@ -122,7 +124,7 @@ func (g gatedCall) execute(ctx context.Context, tools Registry, resultBytesCap i
 	result.Content, result.FailureText = g.redact.Redact(result.Content), g.redact.Redact(result.FailureText)
 	var post hook.Verdict
 	if !result.Repeat {
-		post = g.fire(hook.Input{Event: hook.PostToolUse, Tool: call.Name, Args: call.Arguments, CallID: call.ID, Response: result.Content, Failed: result.FailureText != ""})
+		post = g.fire(ctx, hook.Input{Event: hook.PostToolUse, Tool: call.Name, Args: call.Arguments, CallID: call.ID, Response: result.Content, Failed: result.FailureText != ""})
 	}
 
 	cut := g.cutShellResult(ctx, call.Name, result)

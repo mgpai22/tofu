@@ -43,7 +43,9 @@ func (a *App) key(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return a.interrupt()
 	}
-	a.pressedAt = time.Time{}
+	if !a.view.Stopping {
+		a.pressedAt = time.Time{}
+	}
 	if capturing, open := a.top().(*shortcutsDialog); open {
 		return capturing.key(a, msg)
 	}

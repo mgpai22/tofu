@@ -296,7 +296,25 @@ func (a *watcher) result(message llm.Message, asker string) {
 		}
 	}
 	a.shows.Unlock()
+	result.SubAgents = a.startedBy(message.ToolCallID)
 	a.emit(result)
+}
+
+func (a *watcher) startedBy(call string) []SubAgentRow {
+	if a.spawner == nil {
+		return nil
+	}
+	for _, spawned := range a.spawner.Spawned() {
+		if spawned.Call != call {
+			continue
+		}
+		for _, row := range a.subAgents() {
+			if row.Name == spawned.ID {
+				return []SubAgentRow{row}
+			}
+		}
+	}
+	return nil
 }
 
 func (a *watcher) noteWholeFile(call llm.ToolCall) {

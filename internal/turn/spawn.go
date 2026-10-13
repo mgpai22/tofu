@@ -252,6 +252,9 @@ func (t *SpawnTool) SubAgentRows() []Row {
 }
 
 func (t *SpawnTool) Spawned() []Spawned {
+	if t.tree == nil {
+		return nil
+	}
 	t.tree.mu.Lock()
 	defer t.tree.mu.Unlock()
 	return slices.Clone(t.tree.ran)
@@ -393,8 +396,8 @@ func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error
 		return Result{}, err
 	}
 	narrowed := ""
-	if fire, firing := ctx.Value(hookFireKey{}).(func(hook.Input) hook.Verdict); firing {
-		spawning := fire(hook.Input{Event: hook.SubagentSpawn, CallID: site.call, Spawn: &hook.SpawnFacts{Definition: definition.Name, Mission: args.mission(), Task: args.Task, Owns: append([]string{}, args.Owns...), Ticket: args.Ticket}})
+	if fire, firing := ctx.Value(hookFireKey{}).(func(context.Context, hook.Input) hook.Verdict); firing {
+		spawning := fire(ctx, hook.Input{Event: hook.SubagentSpawn, CallID: site.call, Spawn: &hook.SpawnFacts{Definition: definition.Name, Mission: args.mission(), Task: args.Task, Owns: append([]string{}, args.Owns...), Ticket: args.Ticket}})
 		if spawning.Block != "" {
 			return Result{}, errors.New("spawn refused by a SubagentSpawn hook: " + spawning.Block)
 		}
@@ -428,7 +431,9 @@ func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error
 			recorded = append(recorded, run.Agent)
 		}
 	}
-	naming.waitForEarlier(site.call)
+	if err := naming.waitForEarlier(ctx, site.call); err != nil {
+		return Result{}, fmt.Errorf("spawn stopped before it started: %w", err)
+	}
 	timing.took("earlier siblings")
 	t.tree.mu.Lock()
 	agent := subagent.SubAgent{
@@ -470,7 +475,7 @@ func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error
 		environment: environment + scratchWords(scratch) + t.briefFiles(ctx, args, site.conversation),
 		boundary:    subagent.NewBoundary(subAgentID, scratch.Dir(), args.Owns), scratch: scratch, inbox: NewInbox(),
 		trace: spawnTrace{definition: agent.Agent, model: agent.Model, mission: agent.Mission, owns: args.Owns, ticket: args.Ticket, depth: t.depth + 1}}
-	runCtx, cancel := context.WithCancel(ctx)
+	runCtx, cancel := outlivingTheWave(ctx)
 	t.Inbox.keep(held, cancel)
 	t.tree.mu.Lock()
 	t.tree.ran = append(t.tree.ran, Spawned{ID: subAgentID, Call: site.call, Agent: definition.Name, Slug: opened.Slug, Windows: opened.Windows, Effort: opened.Effort})
@@ -662,7 +667,7 @@ func (t *SpawnTool) converse(ctx context.Context, held *heldSubAgent, subAgent C
 	began := trace.begin(id)
 	claims, sentBack, state, runErr := t.runRounds(ctx, subAgentCtx, held, subAgent)
 	forked := held.forkedSoFar()
-	asked := subAgent.Boundary.Asked()
+	asked := subAgent.Boundary.Reported()
 	last := &claims[len(claims)-1]
 	if err := errors.Join(began, trace.end(id, state)); err != nil {
 		last.Warnings = append(last.Warnings, "this sub-agent run was not wholly recorded: "+err.Error())

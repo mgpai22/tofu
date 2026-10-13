@@ -113,3 +113,71 @@ func TestASpawnOverlappingARunningSubAgentIsRefusedNamingIt(t *testing.T) {
 		t.Fatalf("the second spawn was not refused naming sub-1, or the first did not report:\n%s", heard)
 	}
 }
+
+const firstPiece, secondPiece, thirdPiece = "the first piece", "the second piece", "the third piece"
+
+const refusesTheSecond = `"PreToolUse":[{"matcher":"Agent","hooks":[{"type":"command","command":"if grep -q 'second piece'; then echo 'no ticket names the second piece' >&2; exit 2; fi"}]}]`
+
+func threeSpawns(t *testing.T, hooks string) (*crew, Config) {
+	t.Helper()
+	_, bash := hookedProject(t, "{"+hooks+"}")
+	spawning := func(id, task, owns string) llm.ToolCall { return spawnCall(id, task, owns).ToolCalls[0] }
+	model := newCrew(map[string][]llm.Decision{
+		leadKey: {toolCallDecision(spawning("call-1", firstPiece, "a/**"), spawning("call-2", secondPiece, "b/**"), spawning("call-3", thirdPiece, "c/**")),
+			claimDecision("lead 2"), claimDecision("lead 3"), claimDecision("lead 4"), claimDecision("lead 5")},
+		firstPiece: {claimDecision("first done")},
+		thirdPiece: {claimDecision("third done")},
+	})
+	lead := crewLead(t, model)
+	lead.Tools, lead.Person = NewRegistry(append(lead.Tools.tools, bash)...), alwaysTrusting
+	return model, lead
+}
+
+func TestSpawnASiblingRefusedByAHookNeverHoldsTheNextOneBack(t *testing.T) {
+	model, lead := threeSpawns(t, refusesTheSecond)
+
+	startLead(context.Background(), lead, nil).wait(t)
+
+	if model.answered(thirdPiece) != 1 {
+		t.Errorf("the third spawn's sub-agent answered %d times, want 1", model.answered(thirdPiece))
+	}
+	if refused := answerTo(t, model, "call-2"); !strings.Contains(refused, "no ticket names the second piece") {
+		t.Errorf("the second spawn answered %q, want the hook's refusal", refused)
+	}
+}
+
+func TestStopLeadEndsATurnWhoseSpawnIsBlockedAndTheQueuedMessageIsSent(t *testing.T) {
+	blocksTheThird := `"SubagentSpawn":[{"hooks":[{"type":"command","timeout":600,"command":"if grep -q 'third piece'; then sleep 600; fi"}]}]`
+	model, lead := threeSpawns(t, refusesTheSecond+","+blocksTheThird)
+	release := model.hold(firstPiece, 1)
+	defer release()
+	typed := make(chan string, 1)
+	led := startLead(context.Background(), lead, typed)
+	waitFor(t, "the first sub-agent to start", func() bool { return len(model.requests(firstPiece)) > 0 })
+	time.Sleep(500 * time.Millisecond)
+	typed <- "the queued message"
+
+	stopped := time.Now()
+	lead.Inbox.StopLead()
+	waitFor(t, "the queued message to reach the lead", func() bool {
+		asked := model.requests(leadKey)
+		if len(asked) < 2 {
+			return false
+		}
+		last := asked[len(asked)-1].Messages
+		return strings.Contains(last[len(last)-1].Content, "the queued message")
+	})
+	if took := time.Since(stopped); took > 5*time.Second {
+		t.Errorf("the stop took %v to end the turn, want under 5s", took)
+	}
+	release()
+	select {
+	case <-led.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the lead did not end within 5s of the first sub-agent's report")
+	}
+	if len(model.requests(thirdPiece)) != 0 || model.answered(firstPiece) != 1 {
+		t.Errorf("after the stop the third was asked %d times and the first answered %d, want the third never started and the first left to finish",
+			len(model.requests(thirdPiece)), model.answered(firstPiece))
+	}
+}

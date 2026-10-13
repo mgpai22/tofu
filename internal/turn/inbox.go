@@ -54,6 +54,7 @@ type Inbox struct {
 	unclosed []error
 	asked    []*Asked
 	waits    []*context.CancelCauseFunc
+	waves    []*context.CancelCauseFunc
 	since    time.Time
 	waited   time.Duration
 	stopped  bool
@@ -105,8 +106,47 @@ func (b *Inbox) StopLead() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.stopped = true
-	for _, withdraw := range b.waits {
+	for _, withdraw := range slices.Concat(b.waits, b.waves) {
 		(*withdraw)(leadStopped{})
+	}
+}
+
+type beforeTheWave struct{}
+
+const thePersonStoppedTheLead = "the person stopped the lead before this call ran"
+
+func (b *Inbox) stoppableWave(ctx context.Context) (context.Context, func() error) {
+	if b == nil {
+		return ctx, func() error { return nil }
+	}
+	wave, withdraw := context.WithCancelCause(context.WithValue(ctx, beforeTheWave{}, ctx))
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.stopped {
+		withdraw(leadStopped{})
+	}
+	b.waves = append(b.waves, &withdraw)
+	return wave, func() error {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		b.waves = slices.DeleteFunc(b.waves, func(open *context.CancelCauseFunc) bool { return open == &withdraw })
+		if errors.Is(context.Cause(wave), leadStopped{}) {
+			return context.Canceled
+		}
+		return nil
+	}
+}
+
+func outlivingTheWave(ctx context.Context) (context.Context, context.CancelFunc) {
+	turn, inWave := ctx.Value(beforeTheWave{}).(context.Context)
+	if !inWave {
+		return context.WithCancel(ctx)
+	}
+	run, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	unhook := context.AfterFunc(turn, cancel)
+	return run, func() {
+		unhook()
+		cancel()
 	}
 }
 
@@ -400,6 +440,7 @@ func (b *Inbox) next(ctx context.Context, typed <-chan string) ([]inboxItem, str
 }
 
 func (b *Inbox) settle() error {
+	gaveUp := time.After(konst.StopSubAgentsMillis * time.Millisecond)
 	for {
 		b.mu.Lock()
 		running, unclosed := b.running, b.unclosed
@@ -411,7 +452,11 @@ func (b *Inbox) settle() error {
 		if running == 0 {
 			return errors.Join(unclosed...)
 		}
-		<-b.wake
+		select {
+		case <-b.wake:
+		case <-gaveUp:
+			return fmt.Errorf("%d sub-agents had not ended %v after the lead did, so the lead stopped waiting for them", running, konst.StopSubAgentsMillis*time.Millisecond)
+		}
 	}
 }
 
@@ -627,10 +672,10 @@ func (b *Inbox) releasing(log *session.Log) error {
 
 func Lead(ctx context.Context, config Config, typed <-chan string, heard func(string), ended func(Row, error)) error {
 	var failed []error
-	config.Inbox.mu.Lock()
-	config.Inbox.stopped = false
-	config.Inbox.mu.Unlock()
 	for {
+		config.Inbox.mu.Lock()
+		config.Inbox.stopped = false
+		config.Inbox.mu.Unlock()
 		row, err := Run(ctx, config)
 		ended(row, err)
 		failed = append(failed, err)

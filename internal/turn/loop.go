@@ -174,7 +174,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 	ctx = context.WithValue(ctx, hookEngineKey{}, hooks)
 	row.Warnings = append(row.Warnings, untrustedHooks...)
 	var hookWarnings sync.Mutex
-	fire := func(in hook.Input) hook.Verdict {
+	fire := func(ctx context.Context, in hook.Input) hook.Verdict {
 		in.Session, in.Turn = row.Session, row.ID
 		if config.SpawnedFrom != "" {
 			in.Agent, in.AgentType = origin, config.AgentType
@@ -261,9 +261,9 @@ func Run(ctx context.Context, config Config) (Row, error) {
 	}
 	concluding, taken := "", ""
 	for _, tool := range config.Tools.tools {
-		if spawner, spawning := tool.(*SpawnTool); spawning && !spawner.ChecksWork {
+		if spawner, spawning := tool.(*SpawnTool); spawning {
 			concluding = spawner.cleanReport(config.Task)
-			if concluding == "" {
+			if concluding == "" && !spawner.ChecksWork {
 				taken = spawner.reportTaken(config.Task)
 			}
 		}
@@ -271,9 +271,9 @@ func Run(ctx context.Context, config Config) (Row, error) {
 	var promptRefused, hookContext string
 	if config.SpawnedFrom == "" {
 		if config.SessionSource != "" {
-			hookContext = fire(hook.Input{Event: hook.SessionStart, Source: config.SessionSource}).Context
+			hookContext = fire(ctx, hook.Input{Event: hook.SessionStart, Source: config.SessionSource}).Context
 		}
-		prompted := fire(hook.Input{Event: hook.UserPromptSubmit, Prompt: config.Task})
+		prompted := fire(ctx, hook.Input{Event: hook.UserPromptSubmit, Prompt: config.Task})
 		promptRefused, hookContext = prompted.Block, strings.TrimSpace(hookContext+"\n\n"+prompted.Context)
 	}
 	first := config.FirstUserMessage(concluding+taken, hookContext)
@@ -343,7 +343,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 		if config.SpawnedFrom != "" {
 			return
 		}
-		if said := fire(hook.Input{Event: hook.SessionStart, Source: sessionSourceCompact}).Context; said != "" {
+		if said := fire(ctx, hook.Input{Event: hook.SessionStart, Source: sessionSourceCompact}).Context; said != "" {
 			messages = append(messages, inserted(sourceSessionStartHook, said, time.Time{}))
 		}
 	}
@@ -708,7 +708,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 			if config.SpawnedFrom != "" {
 				stop = hook.SubagentStop
 			}
-			blocked := fire(hook.Input{Event: stop, LastMessage: decision.Content, StopActive: stopContinuations > 0}).Block
+			blocked := fire(ctx, hook.Input{Event: stop, LastMessage: decision.Content, StopActive: stopContinuations > 0}).Block
 			if blocked != "" && stopContinuations < konst.HookStopContinuations {
 				stopContinuations++
 				messages = append(messages, inserted(sourceStopHook, "a "+string(stop)+" hook kept this turn going: "+blocked, time.Time{}))
@@ -766,19 +766,23 @@ func Run(ctx context.Context, config Config) (Row, error) {
 			var tripped bool
 			var repeated ToolCallRow
 			var repeats int
+			var leadStop error
 			author := row.author()
-			for len(pending) > 0 && !tripped {
+			for len(pending) > 0 && !tripped && leadStop == nil {
 				width := max(stepTools.parallelPrefix(pending), 1)
 				wave := make([]gatedCall, 0, width)
 				for _, asked := range pending[:width] {
 					call := asked
 					proxied, proxyRow := config.Proxy.rewrite(ctx, asked)
 					call.Arguments = proxied
-					pre := fire(hook.Input{Event: hook.PreToolUse, Tool: call.Name, Args: call.Arguments, CallID: call.ID})
+					pre := fire(ctx, hook.Input{Event: hook.PreToolUse, Tool: call.Name, Args: call.Arguments, CallID: call.ID})
 					if pre.Args != nil {
 						call.Arguments = pre.Args
 					}
 					request := GateRequest{TurnID: row.ID, Task: config.Task, Tool: call.Name, Args: call.Arguments, Call: call.ID}
+					if pre.Args == nil {
+						request.Asked = asked.Arguments
+					}
 					gated := gatedCall{call: call, asked: asked, proxy: proxyRow, id: session.EventIDFor(origin, call.ID), parent: stepRow.id, author: author, sift: sifter, thrift: thrifter, redact: redactor, task: config.Task, site: recorded.site(call.ID, messages), model: model, fire: fire, hooks: hookRunOf(hook.PreToolUse, pre)}
 					code, asksCode := codeAsked(stepTools, call)
 					if asksCode = asksCode && config.SpawnedFrom != ""; !asksCode {
@@ -831,7 +835,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 					if config.GateMode == GateEnforce {
 						decided, hooked := gated.verdict, ""
 						if gated.gateErr == "" && decided.Verdict != ledger.VerdictUnset && !decided.PersonOnly {
-							judged := fire(hook.Input{Event: hook.GateVerdict, Tool: call.Name, Args: call.Arguments, CallID: call.ID,
+							judged := fire(ctx, hook.Input{Event: hook.GateVerdict, Tool: call.Name, Args: call.Arguments, CallID: call.ID,
 								Gate: &hook.GateFacts{Verdict: decided.Verdict, Risk: decided.Reason, Questions: append([]ledger.Answer{}, decided.Answers...)}})
 							gated.hooks = append(gated.hooks, hookRunOf(hook.GateVerdict, judged)...)
 							if judged.Gate != ledger.VerdictUnset && judged.Gate != decided.Verdict {
@@ -839,7 +843,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 								hooked = "this call did not run: a GateVerdict hook turned the gate's " + string(gated.verdict.Verdict) + " into " + string(judged.Gate) + ": " + judged.GateWhy + ". "
 							}
 						}
-						if gated.refusal = gateRefusal(ctx, config.Person, request, decided, gated.gateErr); gated.refusal != "" {
+						if gated.refusal = gateRefusal(ctx, config.gatePerson(ctx), request, decided, gated.gateErr); gated.refusal != "" {
 							gated.refusal = hooked + gated.refusal
 						}
 					}
@@ -849,8 +853,9 @@ func Run(ctx context.Context, config Config) (Row, error) {
 				rows := make([]ToolCallRow, len(wave))
 				answers := make([]llm.Message, len(wave))
 				memoHits := make([]bool, len(wave))
+				waveCtx, waveEnded := config.Inbox.stoppableWave(ctx)
 				if len(wave) == 1 {
-					rows[0], answers[0], memoHits[0] = wave[0].run(withShellCall(ctx, wave[0].id), toolsFor(wave[0]), config.ResultBytesCap, artifacts, 0)
+					rows[0], answers[0], memoHits[0] = wave[0].run(withShellCall(waveCtx, wave[0].id), toolsFor(wave[0]), config.ResultBytesCap, artifacts, 0)
 				} else {
 					batches++
 					var running sync.WaitGroup
@@ -858,11 +863,12 @@ func Run(ctx context.Context, config Config) (Row, error) {
 					for i, gated := range wave {
 						go func() {
 							defer running.Done()
-							rows[i], answers[i], memoHits[i] = gated.run(withShellCall(ctx, gated.id), toolsFor(gated), config.ResultBytesCap, artifacts, batches)
+							rows[i], answers[i], memoHits[i] = gated.run(withShellCall(waveCtx, gated.id), toolsFor(gated), config.ResultBytesCap, artifacts, batches)
 						}()
 					}
 					running.Wait()
 				}
+				leadStop = waveEnded()
 				for i := range answers {
 					if memoHits[i] {
 						answers[i].Content, answers[i].Images = pointAtCopy(answers[i], messages, answers[:i]), nil
@@ -896,7 +902,10 @@ func Run(ctx context.Context, config Config) (Row, error) {
 				stepRow.Grants = slices.Clone(asked[recordedGrants:])
 				recordedGrants = len(asked)
 			}
-			if err := ctx.Err(); err != nil {
+			if leadStop != nil {
+				refuse(&stepRow, pending, thePersonStoppedTheLead)
+			}
+			if err := cmp.Or(ctx.Err(), leadStop); err != nil {
 				keep(stepRow)
 				return fail(err)
 			}
