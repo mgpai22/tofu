@@ -18,7 +18,7 @@ import (
 	"tofu/internal/boardy"
 )
 
-const boardyUsage = "tofu boardy init|new|list|show|move|log|lint|boards|held|manager|triage|assign|hand|widen|check|view|report|epic|sprint [--json]"
+const boardyUsage = "tofu boardy init|new|list|show|move|log|lint|boards|held|manager|triage|assign|hand|widen|check|view|report|epic|sprint|ask|catchup [--json]"
 
 func boardyUsageOf(subcommand string) string {
 	switch subcommand {
@@ -41,7 +41,7 @@ func boardyUsageOf(subcommand string) string {
 	case "boards":
 		return "tofu boardy boards [--json]"
 	}
-	return cmp.Or(boardyManageUsage(subcommand), boardyViewUsageOf(subcommand))
+	return cmp.Or(boardyManageUsage(subcommand), boardyViewUsageOf(subcommand), boardyDecideUsage(subcommand))
 }
 
 type boardyCall struct {
@@ -116,6 +116,10 @@ func boardyVerb(args []string, out, errOut io.Writer) int {
 		return call.lint()
 	case "held":
 		return call.held()
+	case "ask":
+		return call.ask()
+	case "catchup":
+		return call.catchup()
 	}
 	return call.boards()
 }
@@ -128,7 +132,7 @@ func boardyFlags(args []string) (map[string]string, []string, error) {
 		switch {
 		case !isFlag:
 			rest = append(rest, args[i])
-		case name == "all":
+		case name == "all" || name == "answers":
 			flags[name] = "true"
 		case i+1 == len(args):
 			return nil, nil, fmt.Errorf("--%s needs a value", name)
@@ -393,6 +397,9 @@ func (c boardyCall) show() int {
 		section("Scope", ticket.Scope)
 		for i, revision := range ticket.Acceptance {
 			section(boardy.RevisionHeading(i), revision)
+		}
+		if len(ticket.Questions) > 0 {
+			section(boardy.QuestionsHeading, boardy.QuestionsMarkdown(ticket.Questions))
 		}
 		section("Log", ticket.Log)
 		return lines

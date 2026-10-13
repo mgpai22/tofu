@@ -197,6 +197,11 @@ func (m Managed) validMove(board Board, ticket Ticket, to Status) error {
 	if need, have := max(board.LogToReview, 1), utf8.RuneCountInString(strings.TrimSpace(ticket.Log)); to == Review && have < need {
 		return RefusedError{Ticket: ticket.ID, Why: fmt.Sprintf("its Log has %d characters of evidence, and a ticket reaches review on %s with at least %d", have, board.Key, need)}
 	}
+	if to == NeedsDecision {
+		if err := decidable(ticket); err != nil {
+			return err
+		}
+	}
 	var err error
 	if to == Doing || (!ticket.Status.Live() && to.Live()) {
 		err = m.referencesResolve(ticket)

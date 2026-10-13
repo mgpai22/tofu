@@ -17,7 +17,8 @@ component, spec, size S, M or L) and four sections: Problem, Scope, Acceptance a
 that goes back from review to doing gets a numbered acceptance revision,
 `Acceptance 2`, so every round keeps its own list.
 
-Status is a field: triage, backlog, todo, doing, review, done, dropped, or
+Status is a field: triage, backlog, todo, doing, review, done, dropped,
+needs-decision with a question, or
 blocked with a reason. Numbers come from the board's counter under a file
 lock, and every ticket write takes that ticket's lock, so two processes
 never get one number or write one file at the same time.
@@ -98,6 +99,9 @@ own the same paths. `holds = ["doing", "review"]` in `board.toml` makes
 more statuses hold. An owns entry may be an absolute path outside the
 project, such as `F:/work/other-repo/**` or `/home/me/other-repo/**`; it
 is checked the same way, case-folded on Windows and macOS.
+
+A ticket waiting on the person's call is `needs-decision`; `tofu boardy
+ask` and `tofu boardy catchup` are in `tofu docs boardy-rules`.
 
 ## Undo it
 

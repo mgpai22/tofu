@@ -461,4 +461,6 @@ const (
 	AskPersonOptionsMost    = 4
 	AskPersonHeaderRunes    = 12
 	AskPersonLabelWordsMost = 5
+	BoardTLDRRunesMost      = 120
+	BoardELI5LinesMost      = 3
 )

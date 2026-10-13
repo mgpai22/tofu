@@ -68,6 +68,22 @@ tofu boardy list --fields id,status,assignee,owns --json
 `held` answers `{"held": true, "ticket": "OPS-1", "status": "doing", "glob": "cmd/tofu/**"}`
 from any board of the project, or `{"held": false}`.
 
+Ask the person for a decision they can make in a minute:
+
+```
+tofu boardy ask DEMO-1 --tldr "One catch up file per board, or one per ticket?" --eli5 "Like one shared notepad for the team, or a sticky note on each card." --options "One file per board | One file per ticket" --recommend 1 --why "one place to read"
+tofu boardy move DEMO-1 needs-decision
+tofu boardy catchup
+```
+
+`catchup` prints each open question with its tldr, eli5, options and the
+recommended pick, and writes them to `catchup.md` beside the tickets with an
+empty `answer:` line under each. Write `1`, `2, but keep it short`, or your
+own words there. `tofu boardy catchup --answers` logs every answer on its
+ticket, closes the question, clears the entry, and moves the ticket back to
+where it was once nothing is left to answer. A move to `needs-decision`
+without a question carrying all of that is refused.
+
 A second board in the same project, `tofu boardy init --key OPS`, counts
 from `OPS-1`. With two boards, `new` and `list` take `--board KEY`.
 
@@ -97,7 +113,8 @@ depends: []
 - 2026-10-09 person: parsed every key, the test passes
 ```
 
-Status is one of triage, backlog, todo, doing, review, done, dropped, or
+Status is one of triage, backlog, todo, doing, review, done, dropped,
+needs-decision, or
 blocked with a reason (`--reason`). A ticket moved from review back to
 doing gets an `Acceptance 2` section, a copy of the last list, so each round
 keeps its own acceptance. `events.jsonl` beside the tickets records every
@@ -151,6 +168,8 @@ the lead gives it.
 | `tofu boardy show <ticket>` | prints one ticket |
 | `tofu boardy move <ticket> <status> [--reason text]` | changes its status |
 | `tofu boardy log <ticket> <text>` | appends a dated line to its Log |
+| `tofu boardy ask <ticket> --tldr t --eli5 e --options "a \| b" --recommend n --why w` | puts a question on a ticket |
+| `tofu boardy catchup [--board KEY] [--answers]` | lists open questions and writes `catchup.md`; `--answers` applies what the person wrote |
 | `tofu boardy lint [--board KEY]` | checks every ticket, exits 1 on a finding |
 | `tofu boardy boards` | lists the project's boards |
 

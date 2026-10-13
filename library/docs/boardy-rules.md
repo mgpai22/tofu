@@ -62,6 +62,26 @@ optional `to:` status. A close is a move to done or dropped. Two checkers:
 
 Shadow rules never stop a move.
 
+## A decision for the person
+
+A move to `needs-decision` is refused unless the ticket carries a question
+with a one line tldr, an eli5 of one to three plain lines, two to four
+options, and the option the agent would pick with why:
+
+    tofu boardy ask DEMO-1 --tldr "One file per board?" --eli5 "Like one shared notepad." --options "Per board | Per ticket" --recommend 1 --why "one place to read"
+    tofu boardy move DEMO-1 needs-decision
+    tofu boardy catchup [--answers] [--board KEY] [--json]
+
+`catchup` lists every open question and writes `boards/<KEY>/catchup.md`,
+an empty `answer:` line under each. The person writes an option number, a
+number and a note, or their own words. `catchup --answers`, run by a
+manager, logs each answer on its ticket, removes the question, clears the
+entry, and moves a ticket with no question left back to the status it came
+from. An answer under a tldr that changed since is reported and not used.
+`--json` is the shape the desk app reads. A ticket holds `## Questions`
+only while one is open; a tofu older than 0.5.12 cannot read a ticket in
+`needs-decision`.
+
 ## Check it
 
     tofu boardy manager list

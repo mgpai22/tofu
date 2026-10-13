@@ -25,7 +25,7 @@ const (
 )
 
 func Statuses() []Status {
-	return []Status{Triage, Backlog, Todo, Doing, Review, Done, Dropped, Blocked}
+	return []Status{Triage, Backlog, Todo, Doing, Review, Done, Dropped, Blocked, NeedsDecision}
 }
 
 func (Status) Enum() []string { return enum(Statuses()...) }
@@ -121,10 +121,11 @@ type Front struct {
 
 type Ticket struct {
 	Front
-	Problem    string   `json:"problem"`
-	Scope      string   `json:"scope"`
-	Acceptance []string `json:"acceptance"`
-	Log        string   `json:"log"`
+	Problem    string     `json:"problem"`
+	Scope      string     `json:"scope"`
+	Acceptance []string   `json:"acceptance"`
+	Questions  []Question `json:"questions,omitempty"`
+	Log        string     `json:"log"`
 }
 
 func (t Ticket) Board() string { key, _, _ := strings.Cut(t.ID, "-"); return key }
@@ -189,6 +190,9 @@ func (t Ticket) Markdown() []byte {
 	}
 	for i, revision := range t.Acceptance {
 		section(RevisionHeading(i), revision)
+	}
+	if len(t.Questions) > 0 {
+		section(QuestionsHeading, QuestionsMarkdown(t.Questions))
 	}
 	section("Log", t.Log)
 	return []byte(strings.ReplaceAll(b.String(), "\r\n", "\n"))
@@ -309,11 +313,11 @@ func (t *Ticket) readSections(body string) error {
 			}
 			sections[heading] = ""
 			switch heading {
-			case "Problem", "Scope", "Log":
+			case "Problem", "Scope", QuestionsHeading, "Log":
 			case RevisionHeading(len(t.Acceptance)):
 				t.Acceptance = append(t.Acceptance, "")
 			default:
-				return fmt.Errorf("the section %q is not Problem, Scope, Acceptance, Acceptance <n> in order, or Log", heading)
+				return fmt.Errorf("the section %q is not Problem, Scope, Acceptance, Acceptance <n> in order, Questions, or Log", heading)
 			}
 		case heading != "":
 			sections[heading] += line
@@ -330,5 +334,7 @@ func (t *Ticket) readSections(body string) error {
 		t.Acceptance[i] = strings.TrimSpace(sections[RevisionHeading(i)])
 	}
 	t.Problem, t.Scope, t.Log = strings.TrimSpace(sections["Problem"]), strings.TrimSpace(sections["Scope"]), strings.TrimSpace(sections["Log"])
-	return nil
+	var err error
+	t.Questions, err = parseQuestions(sections[QuestionsHeading])
+	return err
 }
