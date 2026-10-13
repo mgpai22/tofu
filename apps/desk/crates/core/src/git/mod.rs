@@ -85,6 +85,7 @@ pub struct BlameLine {
     pub email: String,
     pub time: i64,
     pub text: String,
+    pub mine: bool,
 }
 
 #[derive(Debug)]

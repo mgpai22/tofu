@@ -185,6 +185,7 @@ pub fn blame(out: &str) -> Result<Vec<BlameLine>, GitError> {
                 email,
                 time,
                 text: text.to_owned(),
+                mine: sha == UNCOMMITTED,
             });
         } else if let Some(name) = line.strip_prefix("author ") {
             name.clone_into(&mut author);

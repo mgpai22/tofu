@@ -9,9 +9,8 @@ const DAY: i64 = 24 * HOUR;
 const WEEK: i64 = 7 * DAY;
 const MONTH: i64 = 30 * DAY;
 const YEAR: i64 = 365 * DAY;
-const YOU: &str = "you";
+const YOU: &str = "You";
 const NOT_COMMITTED: &str = "not committed";
-const NOREPLY: &str = "@users.noreply.github.com";
 
 pub struct Blamed {
     pub text: String,
@@ -31,10 +30,11 @@ pub struct Inline {
 
 impl Inline {
     pub fn name(&self) -> SharedString {
-        let named = Some(self.author.clone()).filter(|author| !author.trim().is_empty());
-        self.user
-            .clone()
-            .or(named)
+        if self.mine {
+            return YOU.into();
+        }
+        Some(self.author.clone())
+            .filter(|author| !author.trim().is_empty())
             .unwrap_or_else(|| self.email.clone())
     }
 }
@@ -44,18 +44,9 @@ pub struct Me<'a> {
     pub login: Option<&'a str>,
 }
 
-fn noreply_login(email: &str) -> Option<&str> {
-    let local = email.strip_suffix(NOREPLY)?;
-    Some(local.rsplit('+').next().unwrap_or(local)).filter(|login| !login.is_empty())
-}
-
 impl Me<'_> {
     fn owns(&self, line: &git::BlameLine) -> bool {
-        let named = |login: &str| {
-            noreply_login(&line.email).is_some_and(|local| local.eq_ignore_ascii_case(login))
-                || line.author.trim().eq_ignore_ascii_case(login)
-        };
-        self.login.is_some_and(named)
+        line.mine
             || self
                 .email
                 .is_some_and(|email| email.eq_ignore_ascii_case(&line.email))
@@ -64,7 +55,6 @@ impl Me<'_> {
     fn user(&self, line: &git::BlameLine) -> Option<SharedString> {
         self.login
             .filter(|_| self.owns(line))
-            .or_else(|| noreply_login(&line.email))
             .map(|login| login.to_owned().into())
     }
 }

@@ -58,7 +58,7 @@ pub fn open_repo(
                 repo.branch,
                 repo.files.len()
             );
-            Changes::Repo(repo)
+            Changes::Repo(Box::new(repo))
         }
         Err(error) => {
             eprintln!("desk: git could not open {}: {error}", path.display());
@@ -76,7 +76,7 @@ enum Pane {
 
 enum Changes {
     Fixture([bool; CHANGES.len()]),
-    Repo(Repo),
+    Repo(Box<Repo>),
     Refused(SharedString),
 }
 

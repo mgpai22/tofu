@@ -1,21 +1,31 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, Once, OnceLock};
 use std::thread;
 
 use super::{Against, BlameLine, Drift, Entry, Git, GitError, Hunk, parse};
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+const NOREPLY: &str = "@users.noreply.github.com";
+const YOU: &str = "You";
 
 pub struct GitBinary {
     program: PathBuf,
     root: PathBuf,
     names: OnceLock<HashMap<String, String>>,
     own_email: OnceLock<Option<String>>,
+    own_login: Arc<OnceLock<Option<String>>>,
+    asked_login: Once,
+    logged: Mutex<HashSet<(String, String)>>,
+}
+
+fn noreply_login(email: &str) -> Option<&str> {
+    let local = email.strip_suffix(NOREPLY)?;
+    Some(local.rsplit('+').next().unwrap_or(local)).filter(|login| !login.is_empty())
 }
 
 fn run_in(
@@ -91,6 +101,9 @@ impl GitBinary {
             root: PathBuf::from(top.trim_end()),
             names: OnceLock::new(),
             own_email: OnceLock::new(),
+            own_login: Arc::new(OnceLock::new()),
+            asked_login: Once::new(),
+            logged: Mutex::new(HashSet::new()),
         })
     }
 
@@ -108,6 +121,30 @@ impl GitBinary {
             Err(error) => return Err(error),
         };
         Ok(self.own_email.get_or_init(|| own).as_deref())
+    }
+
+    fn own_login(&self) -> Option<&str> {
+        self.asked_login.call_once(|| {
+            let (root, into) = (self.root.clone(), Arc::clone(&self.own_login));
+            thread::spawn(move || GitBinary::ask_login(&root, &into));
+        });
+        self.own_login.get().and_then(Option::as_deref)
+    }
+
+    fn ask_login(root: &Path, into: &OnceLock<Option<String>>) {
+        let login = match run_in(
+            Path::new("gh"),
+            root,
+            &["api", "user", "--jq", ".login"],
+            None,
+        ) {
+            Ok(login) => Some(login.trim().to_owned()).filter(|login| !login.is_empty()),
+            Err(error) => {
+                eprintln!("desk: blame has no github login: {error}");
+                None
+            }
+        };
+        into.get_or_init(|| login);
     }
 
     fn names(&self) -> Result<&HashMap<String, String>, GitError> {
@@ -159,14 +196,43 @@ impl Git for GitBinary {
         args.extend(["--", path]);
         let lines = parse::blame(&self.run(&args, contents)?)?;
         let names = self.names()?;
+        let own_email = self.own_email()?;
+        let login = self.own_login();
+        let mut logged = self
+            .logged
+            .lock()
+            .map_err(|_| GitError::Spawn(io::Error::other("the blame log lock is poisoned")))?;
         Ok(lines
             .into_iter()
-            .map(|line| match names.get(&line.email) {
-                Some(name) => BlameLine {
-                    author: name.clone(),
+            .map(|line| {
+                if line.commit.is_none() {
+                    return line;
+                }
+                let user = noreply_login(&line.email);
+                let name = names
+                    .get(&line.email)
+                    .map(|name| name.trim())
+                    .filter(|name| !name.is_empty())
+                    .or(Some(line.author.trim()).filter(|name| !name.is_empty()));
+                let mine = own_email == Some(line.email.as_str())
+                    || login.is_some_and(|login| {
+                        user.or(name)
+                            .is_some_and(|known| known.eq_ignore_ascii_case(login))
+                    });
+                let author = if mine {
+                    YOU
+                } else {
+                    user.or(name).unwrap_or(&line.email)
+                }
+                .to_owned();
+                if logged.insert((line.email.clone(), author.clone())) {
+                    eprintln!("desk: blame author <{}> -> {author}", line.email);
+                }
+                BlameLine {
+                    author,
+                    mine,
                     ..line
-                },
-                None => line,
+                }
             })
             .collect())
     }
