@@ -25,13 +25,13 @@ func boardyUsageOf(subcommand string) string {
 	case "init":
 		return "tofu boardy init --key KEY [--name text] [--json]"
 	case "new":
-		return "tofu boardy new [--board KEY] [--type story|task|bug|subtask] [--priority P0..P4] [--status s] [--points n] [--size S|M|L] [--spec path] [--owns a,b] [--scope text] [--acceptance text] [--as name] <title> [--json]"
+		return "tofu boardy new [--board KEY | --parent ID] [--type story|task|bug|subtask] [--priority P0..P4] [--status s] [--points n] [--size S|M|L] [--spec path] [--owns a,b] [--scope text] [--acceptance text] [--as name] <title> [--json]"
 	case "list":
 		return "tofu boardy list [--board KEY] [--status s] [--all] [--fields id,status,assignee,owns] [--json]"
 	case "held":
 		return "tofu boardy held <path> [--json]"
 	case "show":
-		return "tofu boardy show <ticket> [--json]"
+		return "tofu boardy show <ticket> [--thread] [--json]"
 	case "move":
 		return "tofu boardy move <ticket> <status> [--reason text] [--as name] [--json]"
 	case "log":
@@ -132,7 +132,7 @@ func boardyFlags(args []string) (map[string]string, []string, error) {
 		switch {
 		case !isFlag:
 			rest = append(rest, args[i])
-		case name == "all" || name == "answers":
+		case name == "all" || name == "answers" || name == "thread":
 			flags[name] = "true"
 		case i+1 == len(args):
 			return nil, nil, fmt.Errorf("--%s needs a value", name)
@@ -178,10 +178,15 @@ func (c boardyCall) create() int {
 		return c.o.usage(errors.New("a " + c.words.Ticket + " needs a title"))
 	}
 	key, err := c.board()
+	if parent := c.flags["parent"]; parent != "" {
+		var ref boardy.Ref
+		ref, err = boardy.SplitID(parent)
+		key = ref.Key
+	}
 	if err != nil {
 		return c.o.fail(err)
 	}
-	ticket := boardy.Ticket{Front: boardy.Front{Title: title, Owns: splitList(c.flags["owns"]), Spec: c.flags["spec"]}, Scope: c.flags["scope"]}
+	ticket := boardy.Ticket{Front: boardy.Front{Title: title, Owns: splitList(c.flags["owns"]), Spec: c.flags["spec"], Parent: c.flags["parent"]}, Scope: c.flags["scope"]}
 	if acceptance := c.flags["acceptance"]; acceptance != "" {
 		ticket.Acceptance = []string{acceptance}
 	}
@@ -366,11 +371,15 @@ func (c boardyCall) show() int {
 		return c.o.usage(errors.New("name one " + c.words.Ticket))
 	}
 	ticket, err := c.managed.Get(c.args[0])
+	shown := boardyShown{Ticket: ticket}
+	if err == nil && c.flags["thread"] != "" {
+		shown.Thread, err = c.store.Thread(ticket.ID)
+	}
 	if err != nil {
 		return c.o.fail(err)
 	}
 	path, _ := c.store.TicketPath(ticket.ID)
-	return c.o.done(true, ticket, func(page cli.Page) []string {
+	return c.o.done(true, shown, func(page cli.Page) []string {
 		lines := page.Title(ticket.ID+" "+ticket.Title, []string{string(ticket.Type), string(ticket.Priority)}, cli.Verdict{Mark: statusMark(ticket.Status), Text: string(ticket.Status)})
 		lines = append(lines, page.Facts([]cli.Fact{
 			{Label: c.words.Board, Text: ticket.Board()},
@@ -402,8 +411,34 @@ func (c boardyCall) show() int {
 			section(boardy.QuestionsHeading, boardy.QuestionsMarkdown(ticket.Questions))
 		}
 		section("Log", ticket.Log)
+		if c.flags["thread"] != "" {
+			activity := make([]string, len(shown.Thread))
+			for i, event := range shown.Thread {
+				activity[i] = threadLine(event)
+			}
+			section("Activity", strings.Join(activity, "\n"))
+		}
 		return lines
 	})
+}
+
+type boardyShown struct {
+	boardy.Ticket
+	Thread []boardy.Event `json:"thread,omitempty"`
+}
+
+func threadLine(event boardy.Event) string {
+	line := event.At.Local().Format(time.DateTime) + " " + string(event.Kind) + " " + dash(cmp.Or(event.Agent, event.Actor))
+	if event.From != "" || event.To != "" {
+		line += " " + dash(string(event.From)) + " to " + string(event.To)
+	}
+	if event.Text != "" {
+		line += ": " + event.Text
+	}
+	if len(event.Files) > 0 {
+		line += " (wrote " + strings.Join(event.Files, ", ") + ")"
+	}
+	return line
 }
 
 func (c boardyCall) move() int {

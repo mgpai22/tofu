@@ -12,7 +12,7 @@ import (
 
 const reviewLogFloor = 200
 
-var citedTicket = lazy(`(TOFU|BOJI|DESK)-\d+`)
+var citedTicket = lazy(`(TOFU|BOJI|DESK)-\d+(?:-\d+)?`)
 
 func requireTicket(env Env, ev event) (Answer, error) {
 	kind := ev.ToolInput.SubagentType
@@ -63,7 +63,7 @@ func spawnRefusal(root string, source ticketSource, kind, prompt string) (string
 	}
 	doing, err := source.list(placeDoing)
 	for _, other := range doing {
-		if strings.EqualFold(other.ID, id) {
+		if strings.EqualFold(other.ID, id) || subTicketOf(other.ID, id) || subTicketOf(id, other.ID) {
 			continue
 		}
 		for _, theirs := range other.Owns {
@@ -89,6 +89,11 @@ func spawnRefusal(root string, source ticketSource, kind, prompt string) (string
 		return fmt.Sprintf("%s names owner: %s, which should run as %s, not the requested %s.", id, cited.Owner, strings.Join(allowed, " or "), kind), err
 	}
 	return "", err
+}
+
+func subTicketOf(child, parent string) bool {
+	ref, err := boardy.SplitID(strings.ToUpper(child))
+	return err == nil && strings.EqualFold(ref.Parent(), parent)
 }
 
 func globsOverlap(a, b string) bool {
@@ -151,10 +156,10 @@ If this file genuinely belongs to your ticket, the ticket's owns: is wrong: stop
 
 var (
 	logHeredocOpener = lazy(`^<<'?(\w+)'?\r?\n`)
-	movedTicketFile  = lazy(`(?i)(TOFU|BOJI|DESK)-(\d+)\.md`)
+	movedTicketFile  = lazy(`(?i)(TOFU|BOJI|DESK)-\d+(?:-\d+)?\.md`)
 	moveCommand      = lazy(`(?i)\b(mv|move|move-item|git\s+mv)\b`)
 	reviewFolder     = lazy(`(?i)review[\\/]`)
-	boardyMove       = lazy(`(?i)\bboardy\s+move\s+((?:TOFU|BOJI|DESK)-\d+)\s+([A-Za-z-]+)`)
+	boardyMove       = lazy(`(?i)\bboardy\s+move\s+((?:TOFU|BOJI|DESK)-\d+(?:-\d+)?)\s+([A-Za-z-]+)`)
 )
 
 func ticketLog(env Env, ev event) (Answer, error) {

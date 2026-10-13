@@ -59,7 +59,7 @@ func (c Contract) Block() string {
 }
 
 var (
-	ticketPattern    = regexp.MustCompile(`\b[A-Z][A-Z0-9]{1,15}-\d+\b`)
+	ticketPattern    = regexp.MustCompile(`\b[A-Z][A-Z0-9]{1,15}-\d+(?:-\d+)?\b`)
 	reportedContract = regexp.MustCompile("(?s)```json\\s*(\\{.*?\\})\\s*```")
 )
 

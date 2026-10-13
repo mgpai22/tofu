@@ -54,6 +54,15 @@ takes today where you are.
 Starting a sprint closes the one that was active. Only a manager of the
 board changes its epics, milestones and sprints.
 
+    tofu boardy new --parent DEMO-1 --owns internal/a/parse.go --acceptance "UTF-8 parses" the parser half
+
+makes the sub-ticket `DEMO-1-1`, typed `subtask`, as Linear's sub-issues
+and Jira's subtasks, in the folder `tickets/DEMO-1/`. The parent's owns are
+the ceiling: an entry outside them is refused, naming the parent. A parent
+in doing does not block its own sub-tickets, two sub-tickets in doing may
+not overlap, and a parent reaches review or done only once every sub-ticket
+is done or dropped. There is one level: `DEMO-1-1-1` is not an id.
+
 ## Check it
 
     tofu boardy view
@@ -66,8 +75,9 @@ board changes its epics, milestones and sprints.
 Every subcommand takes `--board KEY` and `--json`.
 
 Over `tofu serve`, capability `boardy`: `boardy.boards`, `boardy.list
-{board, view, filter}`, `boardy.get {id}`, `boardy.events {board,
-since}`, `boardy.report {board, since}`, `boardy.create`, `boardy.move`,
+{board, view, filter}`, `boardy.get {id}` with the ticket's thread (a
+spawn or report event carries session, agent, call and files),
+`boardy.events {board, since}`, `boardy.report {board, since}`, `boardy.create`, `boardy.move`,
 `boardy.assign`, `boardy.log`, `boardy.hand` and `boardy.triage {action}`.
 A watcher sends `boardy.changed {board, paths}` within a second of any
 ticket file changing on disk, whoever wrote it.

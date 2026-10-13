@@ -86,8 +86,9 @@ A filter takes `statuses`, `live`, `sprint` (an id, or `active`), `epic`,
 Every subcommand takes `--board KEY` and `--json`.
 
 Over `tofu serve` (capability `boardy`): `boardy.boards`, `boardy.list
-{board, view, filter}`, `boardy.get {id}` with the ticket's events and its
-rounds and minutes in doing, `boardy.events {board, since}`,
+{board, view, filter}`, `boardy.get {id}` with the ticket's thread (each
+event, and for a spawn or a report its session, agent, call and files) and
+its rounds and minutes in doing, `boardy.events {board, since}`,
 `boardy.report {board, since}`, `boardy.create`, `boardy.move`,
 `boardy.assign`, `boardy.log`, `boardy.hand`, `boardy.triage {action:
 list|accept|drop}`, and the notification `boardy.changed {board, paths}`.

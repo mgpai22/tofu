@@ -130,6 +130,40 @@ func TestTicketToolsKeepASubAgentToItsOwnTicket(t *testing.T) {
 	}
 }
 
+func TestTicketToolsSplitATicketAndThreadTheAsk(t *testing.T) {
+	board := ticketBoard(t)
+	if _, err := tools.TicketGrant(board, "DEMO-2", "lead", "go-dev-1"); err != nil {
+		t.Fatal(err)
+	}
+	lead, err := tools.TicketTools(board, "lead")
+	if err != nil {
+		t.Fatal(err)
+	}
+	create := lead[slices.IndexFunc(lead, func(tool turn.Tool) bool { return tool.Name() == "ticket_create" })]
+	said, err := runTicket(create, `{"board":"DEMO","parent":"DEMO-2","title":"the parser half","acceptance":"- it parses","owns":["internal/a/parse.go"]}`)
+	if err != nil || !strings.Contains(said, "DEMO-2-1") {
+		t.Fatalf("ticket_create under DEMO-2 said %q, %v", said, err)
+	}
+	if _, err := runTicket(create, `{"board":"DEMO","parent":"DEMO-2","title":"outside","acceptance":"- no","owns":["internal/b/**"]}`); err == nil || !strings.Contains(err.Error(), "DEMO-2") {
+		t.Errorf("a child owning outside DEMO-2: %v, want a refusal naming it", err)
+	}
+	owns, err := tools.TicketGrant(board, "DEMO-2-1", "lead", "go-dev-2")
+	if err != nil || !slices.Equal(owns, []string{"internal/a/parse.go"}) {
+		t.Fatalf("a grant on DEMO-2-1 while DEMO-2 is in doing gave %q, %v", owns, err)
+	}
+	if got := subagent.TicketID("work DEMO-2-1 to its acceptance"); got != "DEMO-2-1" {
+		t.Errorf("a brief citing DEMO-2-1 reads as %q", got)
+	}
+	if _, err := runTicket(subAgentTool(t, board, "ticket_ask"), `{"id":"DEMO-2","question":"which encoding"}`); err != nil {
+		t.Fatal(err)
+	}
+	thread, _ := board.Store.Thread("DEMO-2")
+	last := thread[len(thread)-1]
+	if last.Kind != boardy.Asked || last.Actor != "go-dev-1" || last.Text != "which encoding" {
+		t.Errorf("ticket_ask left %+v last on the thread, want an asked event by go-dev-1", last)
+	}
+}
+
 func TestTicketToolsWriteNoBoardWhenThereIsNone(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), boardy.BoardsDirName)
 	list, err := tools.TicketTools(boardy.Managed{Local: boardy.Local{Store: boardy.Store{Dir: dir}}}, "lead")

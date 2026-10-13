@@ -88,7 +88,8 @@ func (t ticketTool) Definition() llm.Tool {
 		properties = map[string]any{
 			"board": text("the board key, such as DEMO"), "title": text("one line"), "problem": text("why the work is needed"),
 			"scope": text("what is in and out"), "acceptance": text("acceptance lines, one per line, each starting with - "),
-			"owns": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "the path globs the work may write"},
+			"owns":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "the path globs the work may write"},
+			"parent": text("a ticket to split, such as DEMO-2: the new one becomes its sub-ticket DEMO-2-1, and its owns must sit inside the parent's"),
 		}
 		required = []string{"board", "title", "acceptance"}
 	case ticketMove:
@@ -107,8 +108,8 @@ func (t ticketTool) Definition() llm.Tool {
 
 func (t ticketTool) Run(_ context.Context, raw json.RawMessage) (turn.Result, error) {
 	var args struct {
-		ID, Text, Question, Board, Title, Problem, Scope, Acceptance, To, Reason string
-		Owns                                                                     []string
+		ID, Text, Question, Board, Title, Problem, Scope, Acceptance, To, Reason, Parent string
+		Owns                                                                             []string
 	}
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return turn.Result{}, fmt.Errorf("%s: arguments are not the expected shape: %w", t.verb, err)
@@ -126,11 +127,11 @@ func (t ticketTool) Run(_ context.Context, raw json.RawMessage) (turn.Result, er
 		ticket, err = t.board.Comment(args.ID, args.Text, t.actor)
 		said = "logged on " + ticket.ID
 	case ticketAsk:
-		ticket, err = t.board.Comment(args.ID, "question for a manager: "+args.Question, t.actor)
+		ticket, err = t.board.AskInLog(args.ID, args.Question, t.actor)
 		said = "asked in the Log of " + ticket.ID + "; a manager answers there"
 	case ticketRequest, ticketCreate:
 		command = string(t.verb) + " " + args.Board
-		draft := boardy.Ticket{Front: boardy.Front{Title: args.Title, Owns: args.Owns}, Problem: args.Problem, Scope: args.Scope, Acceptance: []string{args.Acceptance}}
+		draft := boardy.Ticket{Front: boardy.Front{Title: args.Title, Owns: args.Owns, Parent: args.Parent}, Problem: args.Problem, Scope: args.Scope, Acceptance: []string{args.Acceptance}}
 		if ticket, err = t.board.Create(args.Board, draft, t.actor); ticket.ID == "" {
 			said = ticket.Reason
 		} else {

@@ -63,6 +63,10 @@ func (l Local) Move(id string, to Status, reason, actor string) (Ticket, error) 
 }
 
 func (l Local) Comment(id, text, actor string) (Ticket, error) {
+	return l.appendLog(id, text, actor, Event{Kind: Commented, Text: text})
+}
+
+func (l Local) appendLog(id, text, actor string, event Event) (Ticket, error) {
 	if text == "" {
 		return Ticket{}, fmt.Errorf("a log line needs text")
 	}
@@ -77,5 +81,6 @@ func (l Local) Comment(id, text, actor string) (Ticket, error) {
 	if err != nil {
 		return logged, err
 	}
-	return logged, l.Store.Record(logged.Board(), Event{Ticket: id, Kind: Commented, Actor: actor, Text: text})
+	event.Ticket, event.Actor = id, actor
+	return logged, l.Store.Record(logged.Board(), event)
 }

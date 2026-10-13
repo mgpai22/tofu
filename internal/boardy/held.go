@@ -2,6 +2,7 @@ package boardy
 
 import (
 	"bufio"
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
@@ -38,6 +39,9 @@ func frontOf(path string) (Front, error) {
 func namedFor(path, id string) error {
 	if want := strings.TrimSuffix(filepath.Base(path), ".md"); id != want {
 		return fmt.Errorf("%s: its front matter says id %s", filepath.Base(path), id)
+	}
+	if ref, _ := SplitID(id); filepath.Base(filepath.Dir(path)) != cmp.Or(ref.Parent(), TicketsDirName) {
+		return fmt.Errorf("%s: a ticket lives in %s, and a sub-ticket in the folder of its parent", path, TicketsDirName)
 	}
 	return nil
 }

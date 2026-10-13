@@ -111,14 +111,8 @@ func (a API) Get(request GetRequest) (GetAnswer, error) {
 	if err != nil {
 		return GetAnswer{}, err
 	}
-	all, err := a.Board.Store.Events(ticket.Board(), 0)
-	answer := GetAnswer{Ticket: ticket, Actual: Actuals(all, time.Now())[ticket.ID], Events: []Event{}}
-	for _, event := range all {
-		if event.Ticket == ticket.ID {
-			answer.Events = append(answer.Events, event)
-		}
-	}
-	return answer, err
+	thread, err := a.Board.Store.Thread(ticket.ID)
+	return GetAnswer{Ticket: ticket, Actual: Actuals(thread, time.Now())[ticket.ID], Events: thread}, err
 }
 
 type EventsRequest struct {

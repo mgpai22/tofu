@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -106,7 +107,7 @@ func (m Managed) vetCreate(board Board, ticket Ticket, status Status, replaces s
 	if err := board.cited(ticket); err != nil {
 		return err
 	}
-	return m.ownsFree(board.Key, ticket.ID, ticket.Owns, status, replaces)
+	return m.ownsFree(board.Key, ticket.Front, ticket.Owns, status, replaces)
 }
 
 func (m Managed) mayWiden(board Board, ticket Ticket, actor string) error {
@@ -117,6 +118,14 @@ func (m Managed) mayWiden(board Board, ticket Ticket, actor string) error {
 }
 
 func (m Managed) Comment(id, text, actor string) (Ticket, error) {
+	return m.appendLog(id, text, actor, Event{Kind: Commented, Text: text})
+}
+
+func (m Managed) AskInLog(id, question, actor string) (Ticket, error) {
+	return m.appendLog(id, "question for a manager: "+question, actor, Event{Kind: Asked, Text: question})
+}
+
+func (m Managed) appendLog(id, text, actor string, event Event) (Ticket, error) {
 	ticket, board, err := m.ticketOnBoard(id)
 	if err != nil {
 		return ticket, err
@@ -124,7 +133,7 @@ func (m Managed) Comment(id, text, actor string) (Ticket, error) {
 	if m.role(board, actor) == RoleAgent && ticket.Assignee != actor {
 		return ticket, RefusedError{Ticket: id, Why: fmt.Sprintf("it is assigned to %q, and an agent appends only to its own ticket's Log", ticket.Assignee)}
 	}
-	return m.Local.Comment(id, text, actor)
+	return m.Local.appendLog(id, text, actor, event)
 }
 
 func (m Managed) Widen(id string, owns []string, actor string) (Ticket, error) {
@@ -139,7 +148,7 @@ func (m Managed) Widen(id string, owns []string, actor string) (Ticket, error) {
 	if len(added) == 0 {
 		return ticket, fmt.Errorf("%s already owns %s", id, strings.Join(owns, ", "))
 	}
-	if err := m.ownsFree(board.Key, id, added, ticket.Status, ""); err != nil {
+	if err := m.ownsFree(board.Key, ticket.Front, added, ticket.Status, ""); err != nil {
 		return ticket, err
 	}
 	if err := m.gate(board.Key, m.boardEvent(rule.EventWiden, ticket, ticket.Status, actor)); err != nil {
@@ -202,12 +211,28 @@ func (m Managed) validMove(board Board, ticket Ticket, to Status) error {
 			return err
 		}
 	}
+	if to == Review || to == Done {
+		children, _ := filepath.Glob(filepath.Join(board.Dir, TicketsDirName, ticket.ID, "*.md"))
+		var live []string
+		for _, path := range children {
+			child, err := frontOf(path)
+			if err != nil {
+				return err
+			}
+			if child.Status.Live() {
+				live = append(live, child.ID)
+			}
+		}
+		if len(live) > 0 {
+			return RefusedError{Ticket: ticket.ID, Why: fmt.Sprintf("its sub-tickets %s are still live, and a parent reaches %s only once they are done or dropped", strings.Join(live, ", "), to)}
+		}
+	}
 	var err error
 	if to == Doing || (!ticket.Status.Live() && to.Live()) {
 		err = m.referencesResolve(ticket)
 	}
 	if !board.Holding(ticket.Status) {
-		err = errors.Join(err, m.ownsFree(board.Key, ticket.ID, ticket.Owns, to, ""))
+		err = errors.Join(err, m.ownsFree(board.Key, ticket.Front, ticket.Owns, to, ""))
 	}
 	return err
 }
@@ -221,10 +246,20 @@ func (m Managed) referencesResolve(ticket Ticket) error {
 	return nil
 }
 
-func (m Managed) ownsFree(key, id string, owns []string, status Status, replaces string) error {
+func (m Managed) ownsFree(key string, ticket Front, owns []string, status Status, replaces string) error {
+	id := ticket.ID
 	for _, glob := range owns {
 		if err := unreadableOwns(glob); err != nil {
 			return RefusedError{Ticket: id, Why: err.Error()}
+		}
+	}
+	if ticket.Parent != "" {
+		parent, err := m.Store.Get(ticket.Parent)
+		if err != nil {
+			return err
+		}
+		if glob := outsideOwns(owns, parent.Owns); glob != "" {
+			return RefusedError{Ticket: id, Why: fmt.Sprintf("%s is outside the owns of its parent %s (%s), and a parent's owns are the ceiling for its sub-tickets", glob, parent.ID, strings.Join(parent.Owns, ", "))}
 		}
 	}
 	boards, err := m.Store.Boards()
@@ -240,7 +275,7 @@ func (m Managed) ownsFree(key, id string, owns []string, status Status, replaces
 			return err
 		}
 		for _, held := range fronts {
-			if held.ID == id || held.ID == replaces || !board.Holding(held.Status) {
+			if held.ID == id || held.ID == replaces || family(ticket, held) || !board.Holding(held.Status) {
 				continue
 			}
 			if glob, other, found := ownsMeet(owns, held.Owns); found {

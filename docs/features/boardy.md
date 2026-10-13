@@ -1,6 +1,6 @@
 ---
 title: Boardy
-description: Your own Jira or Linear, kept as markdown files on your disk, with numbered tickets, statuses and a lint that catches two tickets claiming one file.
+description: Your own Jira or Linear, kept as markdown files on your disk, with numbered tickets and sub-tickets, statuses, a thread of what happened on each, and a lint that catches two tickets claiming one file.
 order: 18
 updated: 2026-10-13
 ---
@@ -87,6 +87,30 @@ without a question carrying all of that is refused.
 A second board in the same project, `tofu boardy init --key OPS`, counts
 from `OPS-1`. With two boards, `new` and `list` take `--board KEY`.
 
+Split a ticket into sub-tickets, the way Linear has sub-issues and Jira has
+subtasks:
+
+```
+tofu boardy new --parent DEMO-1 --owns internal/a/parse.go --acceptance "UTF-8 parses" the parser half
+```
+
+That makes `DEMO-1-1`, then `DEMO-1-2`, numbered under the parent and typed
+`subtask`. The parent's owns are the ceiling: an owns entry outside them is
+refused, naming the parent. A parent in doing does not block its own
+sub-tickets, two sub-tickets in doing may not overlap each other, and a
+parent reaches review or done only once every sub-ticket is done or
+dropped. Sub-tickets go one level down: `DEMO-1-1-1` is not an id.
+
+See everything that happened on a ticket, in order:
+
+```
+tofu boardy show DEMO-1 --thread
+```
+
+The Activity section lists each create, move, log line, question and answer,
+each sub-agent spawned on the ticket with its call, and each report it gave
+back with the files it wrote.
+
 ## The ticket file
 
 ```
@@ -118,7 +142,8 @@ needs-decision, or
 blocked with a reason (`--reason`). A ticket moved from review back to
 doing gets an `Acceptance 2` section, a copy of the last list, so each round
 keeps its own acceptance. `events.jsonl` beside the tickets records every
-create, move and log line.
+create, move and log line. A sub-ticket's file sits in its parent's folder,
+`tickets/DEMO-1/DEMO-1-1.md`.
 
 ## Agents work from the board
 
@@ -140,6 +165,8 @@ tofu boardy manager add <lead session id>
   its acceptance revision in force, so a brief that mentions `UTF-8` is
   still read as `DEMO-2`.
 - A resumed session keeps the ticket on the sub-agent's row.
+- The spawn and the report land on the ticket's thread, and a sub-agent's
+  `ticket_ask` lands there as a question.
 - Two board rules, `board_lead` and `board_sub_agent`, reach the prompt only
   while the setting is `boardy`.
 
@@ -150,7 +177,7 @@ tofu boardy manager add <lead session id>
 | `ticket_ask` | every agent | writes a question for a manager into its own ticket's Log |
 | `ticket_request` | every agent | writes a request into a board's triage |
 | `ticket_move` | every agent | an agent moves its own ticket from doing to review; a manager moves any ticket |
-| `ticket_create` | managers | creates a numbered ticket |
+| `ticket_create` | managers | creates a numbered ticket, or a sub-ticket with `parent` |
 | `ticket_assign` | managers | assigns a ticket |
 
 With the setting `off`, the default, nothing changes: no board file is
@@ -162,10 +189,10 @@ the lead gives it.
 | Command | Does |
 |---|---|
 | `tofu boardy init --key KEY [--name text]` | makes a board |
-| `tofu boardy new [--board KEY] [--type t] [--priority P0..P4] [--status s] [--points n] [--size S\|M\|L] [--spec path] [--owns a,b] [--scope text] [--acceptance text] [--as name] <title>` | makes a ticket with the next number |
+| `tofu boardy new [--board KEY \| --parent ID] [--type t] [--priority P0..P4] [--status s] [--points n] [--size S\|M\|L] [--spec path] [--owns a,b] [--scope text] [--acceptance text] [--as name] <title>` | makes a ticket with the next number |
 | `tofu boardy list [--board KEY] [--status s] [--all] [--fields id,status,assignee,owns]` | lists live tickets, or only the named front matter fields |
 | `tofu boardy held <path>` | names the ticket holding a path on any board, and the glob, or says it is not held |
-| `tofu boardy show <ticket>` | prints one ticket |
+| `tofu boardy show <ticket> [--thread]` | prints one ticket; `--thread` adds its Activity in order |
 | `tofu boardy move <ticket> <status> [--reason text]` | changes its status |
 | `tofu boardy log <ticket> <text>` | appends a dated line to its Log |
 | `tofu boardy ask <ticket> --tldr t --eli5 e --options "a \| b" --recommend n --why w` | puts a question on a ticket |

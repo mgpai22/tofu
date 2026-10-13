@@ -127,3 +127,114 @@ func TestOwnsHoldingStatusesFromBoardFile(t *testing.T) {
 		t.Errorf("an unknown holding status: %v, want an error naming it", err)
 	}
 }
+
+func TestSubTicketsLiveUnderTheirParentsOwns(t *testing.T) {
+	m := managedBoard(t, "DEMO", "OPS")
+	parent := ticketIn(t, m, Doing, "internal/a/**", "cmd/a.go")
+	sub := func(parent string, owns ...string) (Ticket, error) {
+		child := ticketWith("child", owns...)
+		child.Parent = parent
+		return m.Create("DEMO", child, manager)
+	}
+	first, err := sub(parent.ID, "internal/a/one.go")
+	if err != nil || first.ID != parent.ID+"-1" || first.Parent != parent.ID || first.Type != Subtask {
+		t.Fatalf("the first child of %s: %s parent %q type %s, %v", parent.ID, first.ID, first.Parent, first.Type, err)
+	}
+	second, err := sub(parent.ID, "internal/a/two/**", "cmd/a.go")
+	if err != nil || second.ID != parent.ID+"-2" {
+		t.Fatalf("the second child: %s, %v", second.ID, err)
+	}
+	for _, outside := range [][]string{{"internal/b.go"}, {"internal/**"}, {"internal/a/../b.go"}, {"cmd/*.go"}} {
+		_, err = sub(parent.ID, outside...)
+		refused(t, err, parent.ID)
+	}
+	_, err = sub(first.ID, "internal/a/one.go")
+	if err == nil || !strings.Contains(err.Error(), first.ID) {
+		t.Errorf("a child of a child: %v, want a refusal naming %s", err, first.ID)
+	}
+	_, err = sub("OPS-9", "internal/a/one.go")
+	if err == nil {
+		t.Error("a child of a ticket on another board was made")
+	}
+	if counter, _ := m.Store.next("DEMO", ""); counter != "DEMO-2" {
+		t.Errorf("children took the board's numbers: the next top-level id is %s, want DEMO-2", counter)
+	}
+	top, err := os.ReadDir(filepath.Join(m.Store.BoardDir("DEMO"), TicketsDirName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range top {
+		if !entry.IsDir() && strings.Count(entry.Name(), "-") > 1 {
+			t.Errorf("%s sits beside the top-level tickets, where tofu 0.5.12 reads it and fails every board read", entry.Name())
+		}
+	}
+
+	if _, err := m.Move(first.ID, Doing, "", manager); err != nil {
+		t.Errorf("a child into doing under its parent in doing: %v", err)
+	}
+	if _, err := m.Move(second.ID, Doing, "", manager); err != nil {
+		t.Errorf("a second child with disjoint owns into doing: %v", err)
+	}
+	overlapping, err := sub(parent.ID, "internal/a/one.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = m.Move(overlapping.ID, Doing, "", manager)
+	refused(t, err, first.ID)
+	if found := overlaps(t, m); len(found) != 0 {
+		t.Errorf("a parent and its children in doing lint %q, want clean", found)
+	}
+	if hold, err := m.Store.Held("internal/a/two/x.go"); err != nil || !hold.Held {
+		t.Errorf("a path under a child in doing: %+v, %v", hold, err)
+	}
+	if _, err := m.Move(parent.ID, Review, "", manager); err == nil || !strings.Contains(err.Error(), first.ID) {
+		t.Errorf("the parent to review with live children: %v, want a refusal naming %s", err, first.ID)
+	}
+	for _, child := range []string{first.ID, second.ID, overlapping.ID} {
+		if _, err := m.Move(child, Done, "", manager); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := m.Move(parent.ID, Review, "", manager); err != nil {
+		t.Errorf("the parent to review once every child is done: %v", err)
+	}
+	path, _ := m.Store.TicketPath(first.ID)
+	if _, err := m.Store.Edit(first.ID, func(t *Ticket) error { t.Owns = []string{"elsewhere/**"}; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	found := m.Store.Lint([]Board{{Key: "DEMO", Dir: m.Store.BoardDir("DEMO")}})
+	if len(found) != 1 || found[0].Ticket != first.ID || found[0].File != path || !strings.Contains(found[0].What, parent.ID) {
+		t.Errorf("a child owning outside its parent lints %+v, want one finding on %s naming %s", found, first.ID, parent.ID)
+	}
+}
+
+func TestThreadKeepsATicketsEventsInOrderAndNoChildsEvents(t *testing.T) {
+	m := managedBoard(t, "DEMO")
+	parent := ticketIn(t, m, Todo, "x/**")
+	child := ticketWith("child", "x/a.go")
+	child.Parent = parent.ID
+	if _, err := m.Create("DEMO", child, manager); err != nil {
+		t.Fatal(err)
+	}
+	for _, event := range []Event{
+		{Ticket: parent.ID, Kind: Spawned, Session: "s1", Agent: "go-dev-1", Call: "call_1", Text: "the mission"},
+		{Ticket: parent.ID + "-1", Kind: Commented, Text: "the child's line"},
+		{Ticket: parent.ID, Kind: Asked, Actor: "s1/" + parent.ID, Text: "which file"},
+		{Ticket: parent.ID, Kind: Reported, Agent: "go-dev-1", Files: []string{"x/b.go"}, Text: "done"},
+	} {
+		if err := m.Store.RecordTicket(event); err != nil {
+			t.Fatal(err)
+		}
+	}
+	thread, err := m.Store.Thread(parent.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kinds []string
+	for _, event := range thread {
+		kinds = append(kinds, string(event.Kind))
+	}
+	if strings.Join(kinds, " ") != "created spawned asked reported" || thread[3].Files[0] != "x/b.go" || thread[1].Call != "call_1" {
+		t.Errorf("the thread of %s reads %v, want created spawned asked reported with the call and the files", parent.ID, kinds)
+	}
+}

@@ -28,11 +28,11 @@ func (m Managed) RemoveManager(key, name, actor string) (Board, error) {
 }
 
 func (m Managed) Assign(id, assignee, actor string) (Ticket, error) {
-	key, _, err := SplitID(id)
+	ref, err := SplitID(id)
 	if err != nil {
 		return Ticket{}, err
 	}
-	if err := m.Manages(key, actor, "assign a ticket"); err != nil {
+	if err := m.Manages(ref.Key, actor, "assign a ticket"); err != nil {
 		return Ticket{}, err
 	}
 	assigned, err := m.Store.Edit(id, func(t *Ticket) error {
@@ -42,7 +42,7 @@ func (m Managed) Assign(id, assignee, actor string) (Ticket, error) {
 	if err != nil {
 		return assigned, err
 	}
-	return assigned, m.Store.Record(key, Event{Ticket: id, Kind: Assigned, Actor: actor, Text: assignee})
+	return assigned, m.Store.Record(ref.Key, Event{Ticket: id, Kind: Assigned, Actor: actor, Text: assignee})
 }
 
 func (m Managed) changeManagers(key, name, actor string, change func(*Board) error) (Board, error) {

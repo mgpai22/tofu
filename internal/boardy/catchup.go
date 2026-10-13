@@ -44,7 +44,7 @@ type Catchup struct {
 	Stale   []TypedAnswer  `json:"stale"`
 }
 
-var catchupHeading = regexp.MustCompile(`^## ([A-Z][A-Z0-9]*-[1-9][0-9]*) Q([1-9][0-9]*): (.*)$`)
+var catchupHeading = regexp.MustCompile(`^## ([A-Z][A-Z0-9]*-[1-9][0-9]*(?:-[1-9][0-9]*)?) Q([1-9][0-9]*): (.*)$`)
 
 func (m Managed) Catchup(key string) (Catchup, error) {
 	path := filepath.Join(m.Store.BoardDir(key), CatchupFileName)

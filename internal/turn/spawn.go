@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"tofu/internal/boardy"
 	"tofu/internal/hook"
 	"tofu/internal/judge/method"
 	"tofu/internal/konst"
@@ -424,6 +425,13 @@ func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error
 		}
 		return Result{}, fmt.Errorf("spawn: %w", err)
 	}
+	if args.Ticket != "" && t.base.Board != nil {
+		spawned := boardy.Event{Ticket: args.Ticket, Kind: boardy.Spawned, Actor: t.base.Session, Session: t.base.Session, Agent: subAgentID, Call: site.call, Text: agent.Mission}
+		if err := t.base.Board.Store.RecordTicket(spawned); err != nil {
+			t.roster.Release(subAgentID)
+			return Result{}, fmt.Errorf("spawn: %s's spawn was not written to %s's thread: %w", subAgentID, args.Ticket, err)
+		}
+	}
 
 	scratch, err := t.scratch(ctx, subAgentID)
 	if err != nil {
@@ -651,6 +659,14 @@ func (t *SpawnTool) converse(ctx context.Context, held *heldSubAgent, subAgent C
 	}
 	contract.Wrote = report.Wrote
 	text := report.Text(t.proseStore()) + "\n\n" + contract.Block()
+	if agent.Ticket != "" && t.base.Board != nil {
+		said, _, _ := strings.Cut(strings.TrimSpace(report.Prose), "\n")
+		summary, _, _ := strings.Cut(contract.Block(), "\n")
+		reported := boardy.Event{Ticket: agent.Ticket, Kind: boardy.Reported, Actor: t.ticketActor(agent.Ticket), Session: t.base.Session, Agent: agent.ID, Call: site.call, Text: cmp.Or(said, report.State) + "; " + summary, Files: report.Wrote}
+		if err := t.base.Board.Store.RecordTicket(reported); err != nil {
+			text += "\n\nthis report was not written to " + agent.Ticket + "'s thread: " + err.Error()
+		}
+	}
 	if runs := held.runsAs(); runs != "" {
 		text = agent.ID + " ran" + runs + "\n\n" + text
 	}

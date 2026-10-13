@@ -18,20 +18,49 @@ const (
 	Created   EventKind = "created"
 	Moved     EventKind = "moved"
 	Commented EventKind = "commented"
+	Spawned   EventKind = "spawned"
+	Reported  EventKind = "reported"
 )
 
 func (EventKind) Enum() []string {
-	return enum(Created, Moved, Commented, RuleFired, Waiting, Requested, Accepted, RequestDropped, Handed, Widened, ManagersChanged, Assigned, Asked, Answered)
+	return enum(Created, Moved, Commented, RuleFired, Waiting, Requested, Accepted, RequestDropped, Handed, Widened, ManagersChanged, Assigned, Asked, Answered, Spawned, Reported)
 }
 
 type Event struct {
-	At     time.Time `json:"at"`
-	Ticket string    `json:"ticket"`
-	Kind   EventKind `json:"kind"`
-	Actor  string    `json:"actor,omitempty"`
-	From   Status    `json:"from,omitempty"`
-	To     Status    `json:"to,omitempty"`
-	Text   string    `json:"text,omitempty"`
+	At      time.Time `json:"at"`
+	Ticket  string    `json:"ticket"`
+	Kind    EventKind `json:"kind"`
+	Actor   string    `json:"actor,omitempty"`
+	From    Status    `json:"from,omitempty"`
+	To      Status    `json:"to,omitempty"`
+	Text    string    `json:"text,omitempty"`
+	Session string    `json:"session,omitempty"`
+	Agent   string    `json:"agent,omitempty"`
+	Call    string    `json:"call,omitempty"`
+	Files   []string  `json:"files,omitempty"`
+}
+
+func (s Store) RecordTicket(event Event) error {
+	ref, err := SplitID(event.Ticket)
+	if err != nil {
+		return err
+	}
+	return s.Record(ref.Key, event)
+}
+
+func (s Store) Thread(id string) ([]Event, error) {
+	ref, err := SplitID(id)
+	if err != nil {
+		return nil, err
+	}
+	all, err := s.Events(ref.Key, 0)
+	thread := []Event{}
+	for _, event := range all {
+		if event.Ticket == id {
+			thread = append(thread, event)
+		}
+	}
+	return thread, err
 }
 
 func (s Store) Record(key string, event Event) error {

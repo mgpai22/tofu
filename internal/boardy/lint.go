@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -36,7 +37,7 @@ func (s Store) Lint(boards []Board) []Finding {
 				continue
 			}
 			tickets[ticket.ID] = ticket
-			highest = max(highest, ticketNumber(path))
+			highest = max(highest, fileRef(path).Number)
 			if board.Holding(ticket.Status) {
 				holding = append(holding, ticket)
 			}
@@ -51,7 +52,7 @@ func (s Store) Lint(boards []Board) []Finding {
 	}
 	for i, a := range holding {
 		for _, b := range holding[i+1:] {
-			if glob, other, found := ownsMeet(a.Owns, b.Owns); found {
+			if glob, other, found := ownsMeet(a.Owns, b.Owns); found && !family(a.Front, b.Front) {
 				findings = append(findings, Finding{Ticket: a.ID, File: s.path(a.ID), What: fmt.Sprintf("%s and %s both hold their owns (%s, %s) and they overlap: %q and %q", a.ID, b.ID, a.Status, b.Status, glob, other)})
 			}
 		}
@@ -89,7 +90,47 @@ func (s Store) lintTicket(ticket Ticket, tickets map[string]Ticket) []Finding {
 			say("%s owns %q: %v", ticket.ID, glob, err)
 		}
 	}
+	if ticket.Parent == "" {
+		return findings
+	}
+	parent, found := tickets[ticket.Parent]
+	if !found {
+		say("%s is a sub-ticket of %s, which no board in this project holds", ticket.ID, ticket.Parent)
+	} else if glob := outsideOwns(ticket.Owns, parent.Owns); glob != "" {
+		say("%s owns %q, outside its parent %s (%s)", ticket.ID, glob, parent.ID, strings.Join(parent.Owns, ", "))
+	}
 	return findings
+}
+
+func family(a, b Front) bool {
+	return a.ID != "" && a.ID == b.Parent || b.ID != "" && b.ID == a.Parent
+}
+
+func outsideOwns(owns, ceiling []string) string {
+	for _, glob := range owns {
+		if !slices.ContainsFunc(ceiling, func(parent string) bool { return ownsInside(heldGlob(glob), heldGlob(parent)) }) {
+			return glob
+		}
+	}
+	return ""
+}
+
+func ownsInside(glob, parent string) bool {
+	if slices.Contains(strings.Split(glob, "/"), "..") {
+		return false
+	}
+	if !strings.Contains(glob, "*") {
+		if path.Ext(glob) != "" {
+			matched, err := subagent.Matches(glob, []string{parent})
+			return matched && err == nil
+		}
+		glob = strings.TrimSuffix(glob, "/") + "/**"
+	}
+	tree, isTree := strings.CutSuffix(parent, "/**")
+	if !isTree && !strings.Contains(parent, "*") && path.Ext(parent) == "" {
+		tree, isTree = strings.TrimSuffix(parent, "/"), true
+	}
+	return glob == parent || parent == "**" || isTree && strings.HasPrefix(glob, tree+"/")
 }
 
 func unreadableOwns(glob string) error {

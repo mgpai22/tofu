@@ -115,6 +115,7 @@ type Front struct {
 	Component  string    `json:"component,omitempty"`
 	Spec       string    `json:"spec,omitempty"`
 	Size       Size      `json:"size,omitempty"`
+	Parent     string    `json:"parent,omitempty"`
 	Created    time.Time `json:"created"`
 	Updated    time.Time `json:"updated"`
 }
@@ -130,15 +131,29 @@ type Ticket struct {
 
 func (t Ticket) Board() string { key, _, _ := strings.Cut(t.ID, "-"); return key }
 
-var ticketID = regexp.MustCompile(`^([A-Z][A-Z0-9]*)-([1-9][0-9]*)$`)
+var ticketID = regexp.MustCompile(`^([A-Z][A-Z0-9]*)-([1-9][0-9]*)(?:-([1-9][0-9]*))?$`)
 
-func SplitID(id string) (key string, number int, err error) {
+type Ref struct {
+	Key    string
+	Number int
+	Child  int
+}
+
+func SplitID(id string) (Ref, error) {
 	match := ticketID.FindStringSubmatch(id)
 	if match == nil {
-		return "", 0, fmt.Errorf("%q is not a ticket id like DEMO-1", id)
+		return Ref{}, fmt.Errorf("%q is not a ticket id like DEMO-1, or DEMO-1-2 for a sub-ticket", id)
 	}
-	number, err = strconv.Atoi(match[2])
-	return match[1], number, err
+	number, err := strconv.Atoi(match[2])
+	child, _ := strconv.Atoi(match[3])
+	return Ref{Key: match[1], Number: number, Child: child}, err
+}
+
+func (r Ref) Parent() string {
+	if r.Child == 0 {
+		return ""
+	}
+	return r.Key + "-" + strconv.Itoa(r.Number)
 }
 
 func (t Ticket) Markdown() []byte {
@@ -252,8 +267,9 @@ func (t *Ticket) set(key, value string) error {
 	}
 	switch key {
 	case "id":
-		t.ID = value
-		_, _, err = SplitID(value)
+		var ref Ref
+		ref, err = SplitID(value)
+		t.ID, t.Parent = value, ref.Parent()
 	case "title":
 		t.Title = value
 	case "type":

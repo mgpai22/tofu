@@ -52,8 +52,8 @@ var boardKey = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,9}$`)
 func (s Store) BoardDir(key string) string { return filepath.Join(s.Dir, key) }
 
 func (s Store) TicketPath(id string) (string, error) {
-	key, _, err := SplitID(id)
-	return filepath.Join(s.BoardDir(key), TicketsDirName, id+".md"), err
+	ref, err := SplitID(id)
+	return filepath.Join(s.BoardDir(ref.Key), TicketsDirName, ref.Parent(), id+".md"), err
 }
 
 func (s Store) Init(key, name string) (Board, error) {
@@ -177,8 +177,8 @@ func ReadTicket(path string) (Ticket, error) {
 	raw, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		id := strings.TrimSuffix(filepath.Base(path), ".md")
-		key, _, _ := SplitID(id)
-		return Ticket{}, fmt.Errorf("no ticket %s on %s", id, key)
+		ref, _ := SplitID(id)
+		return Ticket{}, fmt.Errorf("no ticket %s on %s", id, ref.Key)
 	}
 	if err != nil {
 		return Ticket{}, err
@@ -192,20 +192,30 @@ func ReadTicket(path string) (Ticket, error) {
 
 func (s Store) TicketFiles(key string) ([]string, error) {
 	dir := filepath.Join(s.BoardDir(key), TicketsDirName)
-	names, err := sys.ListFiles(dir, ".md")
-	paths := make([]string, 0, len(names))
-	for _, name := range names {
-		if !strings.HasPrefix(name, ".") {
-			paths = append(paths, filepath.Join(dir, name))
+	var paths []string
+	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || path == dir {
+			return err
 		}
-	}
-	slices.SortFunc(paths, func(a, b string) int { return ticketNumber(a) - ticketNumber(b) })
+		hidden := strings.HasPrefix(entry.Name(), ".")
+		switch {
+		case entry.IsDir() && (hidden || filepath.Dir(path) != dir):
+			return fs.SkipDir
+		case !entry.IsDir() && !hidden && filepath.Ext(path) == ".md":
+			paths = append(paths, path)
+		}
+		return nil
+	})
+	slices.SortFunc(paths, func(a, b string) int {
+		x, y := fileRef(a), fileRef(b)
+		return cmp.Or(cmp.Compare(x.Number, y.Number), cmp.Compare(x.Child, y.Child))
+	})
 	return paths, err
 }
 
-func ticketNumber(path string) int {
-	_, number, _ := SplitID(strings.TrimSuffix(filepath.Base(path), ".md"))
-	return number
+func fileRef(path string) Ref {
+	ref, _ := SplitID(strings.TrimSuffix(filepath.Base(path), ".md"))
+	return ref
 }
 
 func (s Store) Tickets(key string) ([]Ticket, error) {
@@ -229,12 +239,15 @@ func (s Store) Create(key string, ticket Ticket) (Ticket, error) {
 	if _, err := s.Board(key); err != nil {
 		return Ticket{}, err
 	}
-	number, err := s.next(key)
+	id, err := s.next(key, ticket.Parent)
 	if err != nil {
 		return Ticket{}, err
 	}
+	if ticket.Parent != "" {
+		ticket.Type = cmp.Or(ticket.Type, Subtask)
+	}
 	now := time.Now().UTC().Truncate(time.Second)
-	ticket.ID, ticket.Created, ticket.Updated = fmt.Sprintf("%s-%d", key, number), now, now
+	ticket.ID, ticket.Created, ticket.Updated = id, now, now
 	ticket.Status, ticket.Type, ticket.Priority = cmp.Or(ticket.Status, Backlog), cmp.Or(ticket.Type, Task), cmp.Or(ticket.Priority, DefaultPriority)
 	path, _ := s.TicketPath(ticket.ID)
 	err = s.locked(key, ticket.ID, func() error {
@@ -247,12 +260,12 @@ func (s Store) Create(key string, ticket Ticket) (Ticket, error) {
 }
 
 func (s Store) Edit(id string, edit func(*Ticket) error) (Ticket, error) {
-	key, _, err := SplitID(id)
+	ref, err := SplitID(id)
 	if err != nil {
 		return Ticket{}, err
 	}
 	var ticket Ticket
-	err = s.locked(key, id, func() error {
+	err = s.locked(ref.Key, id, func() error {
 		path, _ := s.TicketPath(id)
 		if ticket, err = ReadTicket(path); err != nil {
 			return err
