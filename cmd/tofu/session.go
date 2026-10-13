@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,6 +31,8 @@ const (
 	sessionClock       = "Mon 15:04"
 	sessionDate        = "2 Jan 15:04"
 )
+
+var failureShaped = regexp.MustCompile(`(?i)\b(fail|failed|failure|errors?|fatal|panic|exception|denied|not found|no such file|undefined)\b`)
 
 type sessionSkip = host.SessionSkip
 
@@ -656,9 +659,18 @@ func callReason(result session.ResultBody) string {
 		return result.Error
 	}
 	code := strconv.Itoa(*result.ExitCode)
-	printed := strings.TrimSuffix(strings.TrimSpace(result.Content), "the command exited "+code)
-	lines := strings.Split(strings.TrimSpace(printed), "\n")
-	return strings.TrimSpace("exit " + code + ": " + lines[len(lines)-1])
+	lines := strings.Split(strings.TrimSpace(result.Content), "\n")
+	if exited := slices.IndexFunc(lines, func(line string) bool { return strings.TrimSpace(line) == "the command exited "+code }); exited >= 0 {
+		lines = lines[:exited]
+	}
+	if len(lines) == 0 {
+		return "exit " + code
+	}
+	failed := slices.IndexFunc(lines, failureShaped.MatchString)
+	if failed < 0 {
+		failed = len(lines) - 1
+	}
+	return strings.TrimSpace("exit " + code + ": " + strings.TrimSpace(lines[failed]))
 }
 
 func sessionTrace(store *session.Store, handle string) (sessionTraceReport, error) {

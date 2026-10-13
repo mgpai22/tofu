@@ -131,7 +131,8 @@ finds every call across every generation, and `--command`, `--file`,
 context budget and the error it ended on, `tofu session trace <name>` every
 request, message, tool call, hook run, message tofu added, fork and
 failure, and on a continued session the sub-agents that kept working in
-the session before it, `tofu session
+the session before it, with a failed command's reason taken from its first
+failure line, such as `exit 1: --- FAIL: TestAdd`, `tofu session
 request <name> <request id>` one request exactly as it was sent with its
 response or error body, and `tofu session reads <name>` every file it read.
 Each takes `--json`.

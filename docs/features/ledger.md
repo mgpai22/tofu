@@ -12,6 +12,11 @@ that decided it, the mode (shadow or enforced), the classifier build, the
 latency and the cost. Rows go to one file per day, and only ever get
 appended.
 
+`tofu run` has nobody to answer an ask, so under its default
+`--gate enforce` a call the gate asks about does not run, and the run names
+the posture when that happens. `--gate shadow` is the headless posture: it
+writes the same rows and runs the call.
+
 ## Why every verdict is kept
 
 **A verdict you can't explain is a verdict you can't trust.** `tofu why`

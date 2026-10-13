@@ -316,13 +316,16 @@ Arguments:
   --dir <path>          the directory the task is worked in, required
   --model <id>          the orchestrator's model, otherwise the one the orchestrator role is bound to;
                         a meta/ model is paid by the key tofu login meta stores and picks its own wire
-  --wire <name>         anthropic, codex or openrouter
+  --wire <name>         anthropic, codex or openrouter, otherwise the wire of the --model slug's subscription
   --tools <set>         full, or three for the read, write and bash arm
   --effort <level>      how hard the model thinks: %s.
                         the default is %s. the anthropic wire takes %s,
                         and refuses the rest rather than picking a neighbour.
                         the openrouter wire sends no level and takes no --effort
-  --gate <arm>          off, shadow or enforce, and enforce when not given
+  --gate <arm>          off, shadow or enforce, and enforce when not given. nobody answers
+                        a tofu run, so under enforce and gatePrompt auto a call the gate asks
+                        about runs and is recorded, and a deny or a gate that could not answer
+                        refuses it; under gatePrompt ask an asked call does not run
   --no-gate             the arm that turns the tool gate off
   --sift <arm>          free or judged, otherwise the method table decides which
                         one cuts a bash result before the model reads it. free
@@ -522,7 +525,7 @@ func runTurn(opts runOpts, selected models.Model, built []turn.Tool, plan *tools
 	if registryErr == nil {
 		_ = registry.Prune()
 	}
-	head := ""
+	head, rows := "", []turn.Row{}
 	interrupted, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	context.AfterFunc(interrupted, stop)
@@ -532,7 +535,7 @@ func runTurn(opts runOpts, selected models.Model, built []turn.Tool, plan *tools
 	}
 	runErr := turn.Lead(turn.WithShellRegistry(leading, registry), config, nil, nil, func(row turn.Row, _ error) {
 		printRunRow(out, row, selected.Slug(), selected.WindowText())
-		head = cmp.Or(row.Session, head)
+		head, rows = cmp.Or(row.Session, head), append(rows, row)
 	})
 	for _, warning := range turn.EndSession(context.Background(), cmp.Or(opts.dir, "."), head, sessionEndOther) {
 		_, _ = fmt.Fprintln(errOut, "tofu run: "+warning)
@@ -541,7 +544,10 @@ func runTurn(opts runOpts, selected models.Model, built []turn.Tool, plan *tools
 	for _, subAgent := range subAgentRows(spawner) {
 		askedAs, windows := askedAsOf(subAgent, spawner.Spawned(), selected.Slug(), selected.WindowText())
 		printRunRow(out, subAgent, askedAs, windows)
+		rows = append(rows, subAgent)
 	}
+	requests, calls, unanswered := runTotals(rows)
+	_, _ = fmt.Fprintf(out, "totals requests %d calls %d\n", requests, calls)
 	if head != "" {
 		if headErr := sessions.SetHead(head); headErr != nil {
 			_, _ = fmt.Fprintf(errOut, "tofu run: pointing the head at %s: %v\n", head, headErr)
@@ -549,6 +555,9 @@ func runTurn(opts runOpts, selected models.Model, built []turn.Tool, plan *tools
 	}
 	if gate != nil {
 		_, _ = fmt.Fprintf(out, "gate decisions %d cost $%.6f mode %s\n", gate.decisions, gate.costUSD, config.GateMode)
+		if unanswered > 0 && config.GateMode == turn.GateEnforce {
+			_, _ = fmt.Fprintln(errOut, "tofu run: "+plural(unanswered, "call")+" did not run: nobody answers a tofu run, so under enforce a call the gate asks about runs and is recorded only under gatePrompt auto, and a deny or a gate that could not answer refuses it")
+		}
 	}
 	if scorer != nil {
 		calls, cost := scorer.spend()
@@ -734,6 +743,7 @@ func runConfig(opts runOpts, built []turn.Tool, run runtime) (turn.Config, *turn
 		Proxy:          loadProxySetting(opts.dir).proxy,
 		Inbox:          cmp.Or(run.inbox, turn.NewInbox()),
 		Notify:         run.notify,
+		GatePromptAsks: func() bool { return settingText(dir, settingspkg.GatePrompt, run.notify) == settingspkg.GatePromptAsk },
 	}
 	if run.plan != nil && opts.planEveryStep {
 		config.Plan = run.plan.Shown
@@ -766,7 +776,7 @@ func runConfig(opts runOpts, built []turn.Tool, run runtime) (turn.Config, *turn
 		asking = append(asking, tools.Remember{Store: run.sessions, Session: sessionID, Project: dir, Inbox: config.Inbox, Judge: memoryScopeJudge(dir, run.notify),
 			Auto: func() bool { on, _ := appSetting(dir, settingspkg.AutoMemory); return on != 0 }})
 	}
-	if settingText(dir, boardy.ManagementSetting, run.notify) == string(boardy.ManagementBoardy) {
+	if settingText(dir, boardy.ManagementSetting, run.notify) == string(boardy.ManagementBoardy) && projectHasBoard(dir) {
 		store, err := boardy.OpenStore(dir)
 		if err != nil {
 			return turn.Config{}, nil, err
@@ -1355,6 +1365,21 @@ func subAgentRows(spawner *turn.SpawnTool) []turn.Row {
 	return spawner.SubAgentRows()
 }
 
+func runTotals(rows []turn.Row) (requests, calls, unanswered int) {
+	for _, row := range rows {
+		requests += len(row.Steps)
+		for _, step := range row.Steps {
+			calls += len(step.ToolCalls)
+			for _, call := range step.ToolCalls {
+				if call.Error != "" && (call.GateVerdict == string(ledger.VerdictAsk) || call.GateError != "") {
+					unanswered++
+				}
+			}
+		}
+	}
+	return requests, calls, unanswered
+}
+
 func runFail(errOut io.Writer, err error) int {
 	_, _ = fmt.Fprintf(errOut, "tofu run: %v\n", err)
 	return exitUsage
@@ -1443,11 +1468,17 @@ func parseRunArgs(args []string) (runOpts, error) {
 	if !slices.Contains(runWires(), opts.wire) {
 		return runOpts{}, fmt.Errorf("--wire %q is none of %s", opts.wire, strings.Join(runWires(), ", "))
 	}
-	if source, _, _ := strings.Cut(opts.model, "/"); source == wireMeta {
+	source, _, _ := strings.Cut(opts.model, "/")
+	if source == wireMeta {
 		if slices.Contains(args, "--wire") {
 			return runOpts{}, fmt.Errorf("--model %s is paid by the %s key and reaches its own wire, so it takes no --wire", opts.model, wireMeta)
 		}
 		opts.wire = wireMeta
+	}
+	if opts.model != "" && !slices.Contains(args, "--wire") {
+		if library, err := modelLibrary(""); err == nil {
+			opts.wire = cmp.Or(library.WireFor(models.Subscription(source)), opts.wire)
+		}
 	}
 	if opts.wire == wireKey && opts.effort != "" {
 		return runOpts{}, fmt.Errorf("--effort %s with --wire %s: the openrouter wire sends no reasoning effort, so the level would be dropped without a word",
