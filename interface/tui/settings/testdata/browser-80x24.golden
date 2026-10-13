@@ -8,7 +8,7 @@
     Context       15      Browser driver                        subagent  ▾     
     Files         03      subagent gives the browser steps to a browser sub…    
     Shell         05                                                            
-    Turn          15      Browser steps                               30  ▾     
+    Turn          16      Browser steps                               30  ▾     
     Projects      04      how many actions one browser task may take            
   › Browser       08                                                            
                           Browser model                          default  ▾     

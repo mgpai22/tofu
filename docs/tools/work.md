@@ -21,7 +21,8 @@ a time, so the list can't drift from the work. Parameters: `op`, `items`,
 Once the lead holds a plan, every later request carries it as it stands, as
 the last message, after the part the prompt cache reads. The plan is never
 kept in the conversation, so the cache reads exactly what it would without
-it.
+it. `tofu settings set planEveryStep false` stops that, and the lead then
+sees the plan only in the `plan` tool's own answer.
 
 ## settings
 

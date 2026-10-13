@@ -17,10 +17,10 @@ What it is
     autoMemory, memoryFromAllUsers, learn
   - Files: diffContext, hyperlinks, groupByAgent
   - Shell: persistentRegistry, logTail, killConfirm, shell, foldHidesShell
-  - Turn: decisionCap, turnMaySpawn, oneTurnPerProject, sideChatAccess,
-    subAgentsPerTurn, subAgentDepth, subAgentCache, subAgentCheckSeconds,
-    subAgentWatchSeconds, verifySubAgents, agentSources, modelTier.genius,
-    modelTier.smart, modelTier.worker, modelTier.dumb
+  - Turn: decisionCap, turnMaySpawn, oneTurnPerProject, planEveryStep,
+    sideChatAccess, subAgentsPerTurn, subAgentDepth, subAgentCache,
+    subAgentCheckSeconds, subAgentWatchSeconds, verifySubAgents, agentSources,
+    modelTier.genius, modelTier.smart, modelTier.worker, modelTier.dumb
   - Projects: projectManagement (boardy, the ticket board), boardFlow (the words
     boardy uses), scratchCleanupDays and scratchMaxGB (the scratchpad)
   - Browser: browser, browserDriver, browserSteps, browserModel, browserEffort,
@@ -245,6 +245,11 @@ Turn
       while one session runs a turn in this project, a turn from any other
       session is refused; off lets several sessions run turns in one repository
       at once
+    planEveryStep           true
+      true or false
+      the lead sees its plan, with each step's status, before every step of a
+      turn; off shows the plan only when the plan tool answers. A sub-agent
+      never gets it, and the next turn reads the new value
     sideChatAccess          read
       any text
       what a new side chat may write: read writes nothing, notes writes .md and

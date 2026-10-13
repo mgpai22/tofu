@@ -432,6 +432,15 @@ exit 0
         "kind": "bool"
       },
       {
+        "key": "planEveryStep",
+        "category": "Turn",
+        "value": true,
+        "source": "default",
+        "label": "Plan every step",
+        "description": "the lead sees its plan, with each step's status, before every step of a turn; off shows the plan only when the plan tool answers. A sub-agent never gets it, and the next turn reads the new value",
+        "kind": "bool"
+      },
+      {
         "key": "sideChatAccess",
         "category": "Turn",
         "value": "read",

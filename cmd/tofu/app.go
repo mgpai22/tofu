@@ -712,6 +712,7 @@ func (e *appEngine) Prepare(start host.Turn, hooks host.Hooks) (host.Prepared, e
 	opts.toolSet, opts.contextCeiling = cmp.Or(e.arms.toolSet, opts.toolSet), e.arms.contextCeiling
 	opts.noSubAgents = e.arms.noSubAgents || settingInt(e.dir, settingspkg.TurnMaySpawn, say) == 0
 	opts.readBeforeEdit = settingInt(e.dir, settingspkg.ReadBeforeEdit, say) != 0
+	opts.planEveryStep = settingInt(e.dir, settingspkg.PlanEveryStep, say) != 0
 	prepared := host.Prepared{MaxSteps: opts.maxSteps}
 	shell, err := turn.ResolveRunShell(settingText(e.dir, settingspkg.Shell, say))
 	if err != nil {
@@ -778,7 +779,7 @@ func (e *appEngine) Prepare(start host.Turn, hooks host.Hooks) (host.Prepared, e
 		gate.watch = hooks.Gate
 		prepared.Decisions = func() int { return gate.decisions }
 	}
-	if plan != nil {
+	if plan != nil && opts.planEveryStep {
 		config.Plan = plan.Shown
 	}
 	config.Images = images

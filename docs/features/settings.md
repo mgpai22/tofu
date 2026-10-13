@@ -64,6 +64,7 @@ Turn
     decisionCap             0                                default
     turnMaySpawn            true                             default
     oneTurnPerProject       true                             default
+    planEveryStep           true                             default
     sideChatAccess          read                             default
     subAgentsPerTurn        10                               default
     subAgentDepth           2                                default

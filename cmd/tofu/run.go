@@ -99,6 +99,7 @@ type runOpts struct {
 	gateArm          string
 	noSubAgents      bool
 	readBeforeEdit   bool
+	planEveryStep    bool
 	doneArm          string
 	model            string
 	toolSet          string
@@ -375,6 +376,7 @@ func runVerb(args []string, out, errOut io.Writer) int {
 		}
 	}
 	opts.readBeforeEdit = settingInt(dir, settingspkg.ReadBeforeEdit, say) != 0
+	opts.planEveryStep = settingInt(dir, settingspkg.PlanEveryStep, say) != 0
 	if opts.showPrompt {
 		return showPrompt(opts, out, errOut)
 	}
@@ -507,7 +509,7 @@ func runTurn(opts runOpts, selected models.Model, built []turn.Tool, plan *tools
 	if err != nil {
 		return runFail(errOut, err)
 	}
-	if plan != nil {
+	if plan != nil && opts.planEveryStep {
 		config.Plan = plan.Shown
 	}
 	if spawner != nil {
