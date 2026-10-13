@@ -16,6 +16,10 @@ Read-only calls in one answer run side by side, up to 4 at a time. Writes,
 edits and shell commands run one at a time, in order. Before each step, tofu
 adds anything you typed and any sub-agent report from the inbox.
 
+Each step carries a phase, read from its tool calls: explore, edit, verify,
+or report for a step that calls no tool. `tofu session trace` prints it
+beside each request.
+
 A turn ends on a final message, on the step cap, on the loop guard, or on an
 error. On a cap or the guard, tofu asks the model once more for what it did,
 what is left and what to do next.

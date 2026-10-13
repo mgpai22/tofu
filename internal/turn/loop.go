@@ -19,6 +19,7 @@ import (
 	"tofu/internal/judge/ledger"
 	"tofu/internal/konst"
 	"tofu/internal/llm"
+	"tofu/internal/llm/wire/anthropic"
 	"tofu/internal/recall"
 	"tofu/internal/session"
 	"tofu/internal/shell"
@@ -42,6 +43,8 @@ const aMessageArrivedMidTurn = "the person's next message arrived while you were
 const theLeadSkippedTheLine = "the lead read a message from the person mid-turn and called a tool without a line saying what it changes"
 
 const cronTaskSource = "cron "
+
+const thePlanAsItStands = "[your plan as it stands, shown by tofu before every step, not the person's words]\n"
 
 type SentNow struct{}
 
@@ -326,6 +329,16 @@ func Run(ctx context.Context, config Config) (Row, error) {
 	inserted := func(source, text string, posted time.Time) llm.Message {
 		return llm.Message{Role: llm.RoleUser, Content: text, Origin: llm.Origin{Source: source, PostedAt: posted, TakenAt: now()}}
 	}
+	withPlan := func(messages []llm.Message) []llm.Message {
+		if config.Plan == nil || config.SpawnedFrom != "" {
+			return messages
+		}
+		shown := config.Plan()
+		if shown == "" {
+			return messages
+		}
+		return append(slices.Clip(messages), inserted(anthropic.SourceAfterTheCachedPrefix, thePlanAsItStands+shown, time.Time{}))
+	}
 	compacted := func() {
 		if config.SpawnedFrom != "" {
 			return
@@ -406,6 +419,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 		return begun, missing
 	}
 	keep := func(step StepRow) {
+		step.Phase = PhaseOf(step.ToolCalls)
 		flush()
 		recorded.step(session.EventRequest, step)
 		row.Steps = append(row.Steps, step)
@@ -629,7 +643,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 		}
 		keepNewestPictures(messages)
 		asSent := recall.Measure(artifacts.preview, budget.Bands, historyOf(messages))
-		decision, timing, requestID, err := ask(ctx, "step "+strconv.Itoa(step), llm.Request{Messages: messages, Tools: definitions})
+		decision, timing, requestID, err := ask(ctx, "step "+strconv.Itoa(step), llm.Request{Messages: withPlan(messages), Tools: definitions})
 		if errors.Is(err, SentNow{}) {
 			step--
 			continue
@@ -651,7 +665,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 					config.Notify(told)
 				}
 				asSent = recall.Measure(artifacts.preview, budget.Bands, historyOf(messages))
-				decision, timing, requestID, err = ask(ctx, "step "+strconv.Itoa(step)+", asked again after the overflow shrink", llm.Request{Messages: messages, Tools: definitions})
+				decision, timing, requestID, err = ask(ctx, "step "+strconv.Itoa(step)+", asked again after the overflow shrink", llm.Request{Messages: withPlan(messages), Tools: definitions})
 				if overflowed(err) {
 					err = fmt.Errorf("the context window overflowed again after tofu %s, so the turn ends: %w", shrink, err)
 				}

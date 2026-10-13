@@ -108,6 +108,14 @@ func (p *Plan) Items() []PlanItem {
 	return slices.Clone(p.items)
 }
 
+func (p *Plan) Shown() string {
+	items := p.Items()
+	if len(items) == 0 {
+		return ""
+	}
+	return planText(items)
+}
+
 func parsePlanArgs(raw json.RawMessage) (planArgs, error) {
 	var args planArgs
 	if err := json.Unmarshal(raw, &args); err != nil {

@@ -633,7 +633,7 @@ func tracedRequests(steps []traceRequest, exchanges []session.Exchange) []traceR
 	for _, exchange := range exchanges {
 		request := used[exchange.Request]
 		request.Request, request.Agent, request.Turn, request.Model = exchange.Request, exchange.Agent, exchange.Turn, cmp.Or(request.Model, exchange.Model)
-		request.Why, request.Messages, request.Attempts, request.DurationMS, request.Error = exchange.Why, len(exchange.Messages), len(exchange.Attempts), exchange.DurationMS, exchange.Error
+		request.Why, request.Messages, request.Attempts, request.DurationMS, request.Error = strings.Trim(exchange.Why+" · "+request.Why, " ·"), len(exchange.Messages), len(exchange.Attempts), exchange.DurationMS, exchange.Error
 		for _, hash := range exchange.Messages {
 			if !slices.Contains(before[exchange.Agent], hash) {
 				request.New++
@@ -687,10 +687,17 @@ func traceBody(store *session.Store, id string, events []session.Event, keep fun
 	for _, event := range events {
 		switch event.Kind {
 		case session.EventRequest:
-			var step session.StepBody
+			var step struct {
+				session.StepBody
+				Phase turn.Phase `json:"phase"`
+			}
 			_ = json.Unmarshal(event.Body, &step)
-			report.Requests = append(report.Requests, traceRequest{Request: event.ID, Agent: event.Agent, Turn: event.Turn, Model: step.Model, CostUSD: step.CostUSD,
-				Usage: session.Usage{InputTokens: step.PromptTokens, OutputTokens: step.CompletionTokens, CacheReadTokens: step.CacheReadTokens, CacheWriteTokens: step.CacheWriteTokens}})
+			request := traceRequest{Request: event.ID, Agent: event.Agent, Turn: event.Turn, Model: step.Model, CostUSD: step.CostUSD,
+				Usage: session.Usage{InputTokens: step.PromptTokens, OutputTokens: step.CompletionTokens, CacheReadTokens: step.CacheReadTokens, CacheWriteTokens: step.CacheWriteTokens}}
+			if step.Phase != "" {
+				request.Why = "phase " + string(step.Phase)
+			}
+			report.Requests = append(report.Requests, request)
 		case session.EventToolCall:
 			var call session.CallBody
 			_ = json.Unmarshal(event.Body, &call)

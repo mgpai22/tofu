@@ -15,6 +15,7 @@ import (
 	"tofu/internal/judge/ledger"
 	"tofu/internal/konst"
 	"tofu/internal/llm"
+	"tofu/internal/llm/wire/anthropic"
 	"tofu/internal/sys"
 )
 
@@ -254,5 +255,76 @@ func TestAShadowGateThatTakes300MillisecondsAddsNoTimeToAStep(t *testing.T) {
 	}
 	if !slices.Contains(row.DecisionIDs, "shadow-row") {
 		t.Errorf("the turn row does not carry the shadow decision: %v", row.DecisionIDs)
+	}
+}
+
+type planSetting struct{ held *string }
+
+func (planSetting) Name() string { return "plan" }
+
+func (planSetting) Definition() llm.Tool {
+	return llm.Tool{Name: "plan", Parameters: map[string]any{"type": "object"}}
+}
+
+func (p planSetting) Run(context.Context, json.RawMessage) (Result, error) {
+	*p.held = "plan, 3 items\n  running  read the spec\n  pending  write the routes\n  pending  run the tests"
+	return Result{Content: *p.held}, nil
+}
+
+func TestLoopShowsThePlanAfterTheCachedPrefixOfEveryLaterRequestAndKeepsItOutOfHistory(t *testing.T) {
+	call := func(id, name string) llm.ToolCall {
+		return llm.ToolCall{ID: id, Name: name, Arguments: json.RawMessage(`{}`)}
+	}
+	for _, spawnedFrom := range []string{"", "turn-lead"} {
+		held := ""
+		model := &stubModel{decisions: []llm.Decision{
+			toolCallDecision(call("call-1", "read")),
+			toolCallDecision(call("call-2", "plan")),
+			toolCallDecision(call("call-3", "edit")),
+			toolCallDecision(call("call-4", "test")),
+			messageDecision(),
+		}}
+		row, err := Run(context.Background(), Config{Model: model, Spend: SpendAPIKey, Task: "add the routes",
+			Tools:          NewRegistry(namedTool("read"), planSetting{held: &held}, namedTool("edit"), namedTool("test")),
+			Plan:           func() string { return held },
+			SpawnedFrom:    spawnedFrom,
+			ResultBytesCap: 4096, ArtifactDir: t.TempDir(), NoLastWord: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(model.requests) != 5 {
+			t.Fatalf("the model was asked %d times, want 5", len(model.requests))
+		}
+		shown := 0
+		for index, request := range model.requests {
+			last := request.Messages[len(request.Messages)-1]
+			planned := held != "" && strings.HasSuffix(last.Content, held) && last.Origin.Source == anthropic.SourceAfterTheCachedPrefix
+			if planned {
+				shown++
+			}
+			if wanted := index >= 2 && spawnedFrom == ""; planned != wanted {
+				t.Errorf("spawned from %q: request %d carries the plan last: %v, want %v", spawnedFrom, index+1, planned, wanted)
+			}
+			if index < 3 || spawnedFrom != "" {
+				continue
+			}
+			before, now := model.requests[index-1].Messages, request.Messages
+			if !reflect.DeepEqual(now[:len(before)-1], before[:len(before)-1]) {
+				t.Errorf("request %d does not begin with request %d less its plan, so the plan entered the history", index+1, index)
+			}
+		}
+		for _, message := range row.Conversation {
+			if strings.HasSuffix(message.Content, held) && message.Role == llm.RoleUser {
+				t.Errorf("spawned from %q: the conversation kept the plan as a message of its own", spawnedFrom)
+			}
+		}
+		phases := make([]Phase, len(row.Steps))
+		for index, step := range row.Steps {
+			phases[index] = step.Phase
+		}
+		if want := []Phase{PhaseExplore, PhaseExplore, PhaseEdit, PhaseVerify, PhaseReport}; !slices.Equal(phases, want) {
+			t.Errorf("spawned from %q: the steps carry phases %v, want %v", spawnedFrom, phases, want)
+		}
+		t.Logf("spawned from %q: the plan rode last on %d of %d requests, phases %v", spawnedFrom, shown, len(model.requests), phases)
 	}
 }

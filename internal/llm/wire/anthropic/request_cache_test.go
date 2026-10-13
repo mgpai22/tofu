@@ -24,6 +24,7 @@ import (
 	"tofu/internal/session"
 	"tofu/internal/subagent"
 	"tofu/internal/turn"
+	"tofu/internal/turn/tools"
 	shipped "tofu/library"
 )
 
@@ -472,6 +473,68 @@ func TestASessionsLaterTurnSendsTheSystemPromptAndToolsItsFirstTurnSent(t *testi
 		t.Fatal("the second turn rewrote its system prompt or a tool description, so the cached head breaks")
 	}
 	assertCachedPrefixCarriesOver(t, headOf(inCacheOrder(t, server.bodies[0])), headOf(inCacheOrder(t, server.bodies[1])))
+}
+
+func cacheReadBytes(t *testing.T, earlier, later []byte) int {
+	t.Helper()
+	asked := inCacheOrder(t, later)
+	read, matched := 0, 0
+	for index, piece := range inCacheOrder(t, earlier) {
+		if index >= len(asked) || asked[index].text != piece.text {
+			break
+		}
+		matched += len(piece.text)
+		if piece.breakpoint {
+			read = matched
+		}
+	}
+	return read
+}
+
+func TestThePlanRidesAfterTheCachedPrefixAndTheCacheReadsWhatItReadWithoutIt(t *testing.T) {
+	steps := [][]string{
+		toolUseEvents(map[string]any{"plan": map[string]any{"op": "set", "items": []map[string]string{
+			{"text": "read the spec"}, {"text": "write the routes"}, {"text": "run the tests"}}}}),
+		toolUseEvents(map[string]any{"read": map[string]string{"path": "API_SPEC.md"}}),
+		toolUseEvents(map[string]any{"plan": map[string]any{"op": "start", "item": "write the routes"}}),
+		toolUseEvents(map[string]any{"write": map[string]string{"path": "src/routes.ts", "content": "export const routes = []\n"}}),
+		textEvents(),
+	}
+	read := map[bool][]int{}
+	for _, shown := range []bool{false, true} {
+		var bodies [][]byte
+		config, built := servedSession(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			bodies = append(bodies, body)
+			stream(w, steps[min(len(bodies), len(steps))-1])
+		}))
+		plan := tools.NewPlan()
+		config.Tools, config.Task, config.Caps.MaxSteps = turn.NewRegistry(append(built, plan)...), firstTurnTask, 10
+		if shown {
+			config.Plan = plan.Shown
+		}
+		if _, err := turn.Run(context.Background(), config); err != nil {
+			t.Fatalf("running with the plan shown %v: %v", shown, err)
+		}
+		if len(bodies) != len(steps) {
+			t.Fatalf("the turn sent %d requests, want %d", len(bodies), len(steps))
+		}
+		for index, body := range bodies {
+			pieces := inCacheOrder(t, body)
+			last := pieces[len(pieces)-1]
+			carries := strings.Contains(last.text, `"type":"text"`) && strings.Contains(last.text, "read the spec")
+			if wanted := shown && index > 0; carries != wanted || carries && last.breakpoint {
+				t.Errorf("shown %v: request %d ends on %s carrying the plan %v and marked %v, want the plan %v and never marked", shown, index+1, last.where, carries, last.breakpoint, wanted)
+			}
+			if index > 0 {
+				read[shown] = append(read[shown], cacheReadBytes(t, bodies[index-1], body))
+			}
+		}
+	}
+	if !slices.Equal(read[true], read[false]) {
+		t.Fatalf("the cache reads %v bytes with the plan shown and %v without it", read[true], read[false])
+	}
+	t.Logf("cache read bytes per later request, with the plan %v, without it %v", read[true], read[false])
 }
 
 func assertFirstMessageCarries(t *testing.T, body []byte, wanted ...string) {

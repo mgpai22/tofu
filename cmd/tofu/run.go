@@ -393,7 +393,7 @@ func runVerb(args []string, out, errOut io.Writer) int {
 	home, _ := os.UserHomeDir()
 	warm := newWarmProcesses(tools.NewBrowserTabs(home))
 	defer warm.Close()
-	built, _, err := buildRunToolsForRun(opts.dir, opts.toolSet, readsWhen(opts.readBeforeEdit, turn.NewReadLedger()), warm, shell)
+	built, plan, err := buildRunToolsForRun(opts.dir, opts.toolSet, readsWhen(opts.readBeforeEdit, turn.NewReadLedger()), warm, shell)
 	if err != nil {
 		return runFail(errOut, err)
 	}
@@ -416,7 +416,7 @@ func runVerb(args []string, out, errOut io.Writer) int {
 		_, _ = fmt.Fprintln(out, string(body))
 		return exitOK
 	}
-	return runTurn(opts, selected, built, budget, warm.tabs, out, errOut)
+	return runTurn(opts, selected, built, plan, budget, warm.tabs, out, errOut)
 }
 
 func contextBudget(opts runOpts, model models.Model) (recall.Budget, error) {
@@ -462,7 +462,7 @@ func guarded(model turn.Model, budget recall.Budget) (turn.Model, error) {
 	return windowGuard{inner: model, budget: budget, cfg: cfg}, nil
 }
 
-func runTurn(opts runOpts, selected models.Model, built []turn.Tool, budget recall.Budget, tabs *tools.BrowserTabs, out, errOut io.Writer) int {
+func runTurn(opts runOpts, selected models.Model, built []turn.Tool, plan *tools.Plan, budget recall.Budget, tabs *tools.BrowserTabs, out, errOut io.Writer) int {
 	open := openAppWire
 	deck, err := readCassette(os.Getenv(cassetteVariable))
 	if err != nil {
@@ -506,6 +506,9 @@ func runTurn(opts runOpts, selected models.Model, built []turn.Tool, budget reca
 		open: open, wrapSubAgent: wrap, orchestrator: selected, tabs: tabs})
 	if err != nil {
 		return runFail(errOut, err)
+	}
+	if plan != nil {
+		config.Plan = plan.Shown
 	}
 	if spawner != nil {
 		review, reviewErr := newDoneReview(opts.doneArm)

@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"tofu/internal/hook"
@@ -89,11 +91,54 @@ func (r ToolCallRow) Outcome() llm.ToolOutcome {
 	return llm.ToolOutcomeRan
 }
 
+type Phase string
+
+const (
+	PhaseExplore Phase = "explore"
+	PhaseEdit    Phase = "edit"
+	PhaseVerify  Phase = "verify"
+	PhaseReport  Phase = "report"
+)
+
+func PhaseOf(calls []ToolCallRow) Phase {
+	if len(calls) == 0 {
+		return PhaseReport
+	}
+	phase := PhaseExplore
+	for _, call := range calls {
+		if call.Tool == "write" || call.Tool == "edit" {
+			return PhaseEdit
+		}
+		if runsACheck(call) {
+			phase = PhaseVerify
+		}
+	}
+	return phase
+}
+
+func runsACheck(call ToolCallRow) bool {
+	words := strings.FieldsFunc(call.Tool, func(r rune) bool { return r == '_' })
+	if call.Tool == ShellToolName || call.Tool == bashToolName {
+		for _, segment := range strings.FieldsFunc(call.Command, func(r rune) bool { return strings.ContainsRune("&|;\n", r) }) {
+			fields := strings.Fields(segment)
+			words = append(words, fields[:min(2, len(fields))]...)
+		}
+	}
+	return slices.ContainsFunc(words, func(word string) bool {
+		switch strings.ToLower(word) {
+		case "test", "typecheck", "check", "lint", "vet", "build", "tsc", "pytest", "clippy":
+			return true
+		}
+		return false
+	})
+}
+
 type StepRow struct {
 	id      string
 	attempt int
 
 	Index            int               `json:"index"`
+	Phase            Phase             `json:"phase,omitempty"`
 	ToolCalls        []ToolCallRow     `json:"tool_calls,omitempty"`
 	AssistantText    string            `json:"assistant_text,omitempty"`
 	Model            string            `json:"model,omitempty"`

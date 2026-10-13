@@ -38,6 +38,8 @@ type Request struct {
 	OnRetry             func()
 }
 
+const SourceAfterTheCachedPrefix = "after the cached prefix"
+
 const (
 	historyCacheMinPrefixChars    = 4096
 	historyCacheCommittedMinChars = 4096
@@ -125,10 +127,21 @@ func (r Request) Encode(oauth bool) ([]byte, error) {
 	if r.Model == "" {
 		return nil, transport.Fail("anthropic.Encode", transport.KindBadRequest, nil, "the request has no model")
 	}
-	messages, err := encodeMessages(r.Messages, oauth)
+	cached := len(r.Messages)
+	for cached > 0 && r.Messages[cached-1].Origin.Source == SourceAfterTheCachedPrefix {
+		cached--
+	}
+	messages, err := encodeMessages(r.Messages[:cached], oauth)
 	if err != nil {
 		return nil, err
 	}
+	after, err := encodeMessages(r.Messages[cached:], oauth)
+	if err != nil {
+		return nil, err
+	}
+	held := len(messages)
+	messages = append(messages, after...)
+	history := messages[:held]
 	if err := everyToolUseAnswered(messages); err != nil {
 		return nil, err
 	}
@@ -147,16 +160,16 @@ func (r Request) Encode(oauth bool) ([]byte, error) {
 
 	system := systemBlocks(r.System, oauth, BillingSystemBlock(firstUserText(r.Messages), cmp.Or(r.ClaudeCodeVersion, PinnedClaudeCodeVersion)), r.CacheTTL)
 	head := applyHeadCaching(system, tools, r.CacheTTL)
-	if opensOnStandingContext(messages) {
-		markPrefixEnd(messages[0].Content, r.CacheTTL)
+	if opensOnStandingContext(history) {
+		markPrefixEnd(history[0].Content, r.CacheTTL)
 		head++
-		if head == cacheBreakpointsPerRequest && !r.HistoryCacheOff && historyChars(messages) >= historyCacheMinPrefixChars {
+		if head == cacheBreakpointsPerRequest && !r.HistoryCacheOff && historyChars(history) >= historyCacheMinPrefixChars {
 			tools[len(tools)-1].CacheControl = nil
 			head--
 		}
 	}
 	if !r.HistoryCacheOff {
-		applyHistoryCaching(messages, r.CacheTTL, cacheBreakpointsPerRequest-head)
+		applyHistoryCaching(history, r.CacheTTL, cacheBreakpointsPerRequest-head)
 	}
 
 	userID, err := metadataUserID(r, oauth)

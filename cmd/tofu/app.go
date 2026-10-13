@@ -778,6 +778,9 @@ func (e *appEngine) Prepare(start host.Turn, hooks host.Hooks) (host.Prepared, e
 		gate.watch = hooks.Gate
 		prepared.Decisions = func() int { return gate.decisions }
 	}
+	if plan != nil {
+		config.Plan = plan.Shown
+	}
 	config.Images = images
 	config.Person = person.Asking(func() bool { return settingText(e.dir, settingspkg.GatePrompt, say) == settingspkg.GatePromptAsk })
 	prepared.Config, prepared.Spawner, prepared.Plan, prepared.Ceiling, prepared.Sessions, prepared.GateOff = config, spawner, plan, budget.CeilingTokens, sessions, gateErr

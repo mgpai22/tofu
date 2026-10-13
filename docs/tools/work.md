@@ -18,6 +18,11 @@ You see what the model intends before it acts, and one item runs at
 a time, so the list can't drift from the work. Parameters: `op`, `items`,
 `item`.
 
+Once the lead holds a plan, every later request carries it as it stands, as
+the last message, after the part the prompt cache reads. The plan is never
+kept in the conversation, so the cache reads exactly what it would without
+it.
+
 ## settings
 
 `settings` is a request to you to raise `subAgentsPerTurn` (10) or

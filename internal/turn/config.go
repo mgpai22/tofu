@@ -89,6 +89,7 @@ type Config struct {
 	Environment     string
 	Instructions    string
 	Memory          string
+	Plan            func() string
 	Prefix          *Prefix
 	ImagesOf        func(said string) []llm.Image
 	Caps            Caps
