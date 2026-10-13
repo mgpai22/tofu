@@ -302,10 +302,10 @@ func TestLoopShowsThePlanAfterTheCachedPrefixOfEveryLaterRequestAndKeepsItOutOfH
 			if planned {
 				shown++
 			}
-			if wanted := index >= 2 && spawnedFrom == ""; planned != wanted {
+			if wanted := index >= 2; planned != wanted {
 				t.Errorf("spawned from %q: request %d carries the plan last: %v, want %v", spawnedFrom, index+1, planned, wanted)
 			}
-			if index < 3 || spawnedFrom != "" {
+			if index < 3 {
 				continue
 			}
 			before, now := model.requests[index-1].Messages, request.Messages

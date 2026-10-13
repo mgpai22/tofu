@@ -178,6 +178,33 @@ type SpawnTool struct {
 	roster         *subagent.Roster
 	warmups        map[string]*warmup
 	naming         *namingOrder
+	plans          map[string]agentPlan
+}
+
+type agentPlan struct {
+	tool  Tool
+	shown func() string
+}
+
+func (t *SpawnTool) ownPlan(id string, lead Tool) (agentPlan, bool) {
+	if memoised, cached := lead.(interface{ Uncached() Tool }); cached {
+		lead = memoised.Uncached()
+	}
+	separable, isPlan := lead.(interface{ ForAnotherAgent() (Tool, func() string) })
+	if !isPlan {
+		return agentPlan{}, false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if kept, made := t.plans[id]; made {
+		return kept, true
+	}
+	if t.plans == nil {
+		t.plans = map[string]agentPlan{}
+	}
+	tool, shown := separable.ForAnotherAgent()
+	t.plans[id] = agentPlan{tool: tool, shown: shown}
+	return t.plans[id], true
 }
 
 type spawnTree struct {
@@ -534,7 +561,11 @@ func (t *SpawnTool) subAgentConfig(held *heldSubAgent, site spawnSite, check *ch
 		return len(held.definition.Tools) == 0 || slices.Contains(held.definition.Tools, name)
 	}
 	var owned []Tool
+	var plan agentPlan
 	for _, tool := range t.base.Tools.tools {
+		if own, isPlan := t.ownPlan(held.agent.ID, tool); isPlan {
+			tool, plan = own.tool, own
+		}
 		switch {
 		case !offered(tool.Name()) && !strings.HasPrefix(tool.Name(), "scratch_"):
 			continue
@@ -556,6 +587,9 @@ func (t *SpawnTool) subAgentConfig(held *heldSubAgent, site spawnSite, check *ch
 	}
 	subAgent := t.base
 	subAgent.Memory = ""
+	if subAgent.Plan != nil {
+		subAgent.Plan = plan.shown
+	}
 	subAgent.Tools = claimedTools(NewRegistry(append(owned, watchedTool{tool: askTool{orchestrator: t, asking: held.agent, conversation: site.conversation}, held: held})...), t.base.Sessions, t.base.Session)
 	subAgent.Caps.MaxSteps, subAgent.Caps.MaxForks = cmp.Or(subAgent.Caps.MaxSteps, konst.SubAgentMaxSteps), konst.SubAgentMaxForks
 	subAgent.Caps.WallClock = cmp.Or(t.limits().WallClock, konst.SubAgentWallClockSeconds*time.Second)

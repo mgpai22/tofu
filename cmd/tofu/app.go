@@ -771,16 +771,13 @@ func (e *appEngine) Prepare(start host.Turn, hooks host.Hooks) (host.Prepared, e
 	}
 	person := hooks.Inbox.LeadAsks(hooks.Person)
 	config, spawner, err := runConfig(opts, built, runtime{accounts: opened.held.forTurn(), spend: opened.spend, budget: budget, gate: gate, sift: sifter, scorer: scorer, sessions: sessions, notify: say, roster: hooks.Roster, inbox: hooks.Inbox, now: hooks.Now,
-		open: e.open, wrapSubAgent: wrapSubAgent, orchestrator: opened.selected, tabs: e.tabs, leadAsks: person, cron: hooks.Cron})
+		open: e.open, wrapSubAgent: wrapSubAgent, orchestrator: opened.selected, tabs: e.tabs, leadAsks: person, cron: hooks.Cron, plan: plan})
 	if err != nil {
 		return prepared, err
 	}
 	if gate != nil {
 		gate.watch = hooks.Gate
 		prepared.Decisions = func() int { return gate.decisions }
-	}
-	if plan != nil && opts.planEveryStep {
-		config.Plan = plan.Shown
 	}
 	config.Images = images
 	config.Person = person.Asking(func() bool { return settingText(e.dir, settingspkg.GatePrompt, say) == settingspkg.GatePromptAsk })

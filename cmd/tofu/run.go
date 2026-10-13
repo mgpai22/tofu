@@ -117,6 +117,7 @@ type runOpts struct {
 
 type runtime struct {
 	model        turn.Model
+	plan         *tools.Plan
 	accounts     turn.Accounts
 	spend        turn.Spend
 	budget       recall.Budget
@@ -505,12 +506,9 @@ func runTurn(opts runOpts, selected models.Model, built []turn.Tool, plan *tools
 	}
 
 	config, spawner, err := runConfig(opts, built, runtime{accounts: opened.held.forTurn(), spend: opened.spend, budget: budget, gate: gate, sift: sifter, scorer: scorer, sessions: sessions, notify: writeNotice(errOut),
-		open: open, wrapSubAgent: wrap, orchestrator: selected, tabs: tabs})
+		open: open, wrapSubAgent: wrap, orchestrator: selected, tabs: tabs, plan: plan})
 	if err != nil {
 		return runFail(errOut, err)
-	}
-	if plan != nil && opts.planEveryStep {
-		config.Plan = plan.Shown
 	}
 	if spawner != nil {
 		review, reviewErr := newDoneReview(opts.doneArm)
@@ -736,6 +734,9 @@ func runConfig(opts runOpts, built []turn.Tool, run runtime) (turn.Config, *turn
 		Proxy:          loadProxySetting(opts.dir).proxy,
 		Inbox:          cmp.Or(run.inbox, turn.NewInbox()),
 		Notify:         run.notify,
+	}
+	if run.plan != nil && opts.planEveryStep {
+		config.Plan = run.plan.Shown
 	}
 	if run.gate != nil {
 		config.Gate = run.gate

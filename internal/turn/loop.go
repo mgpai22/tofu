@@ -330,7 +330,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 		return llm.Message{Role: llm.RoleUser, Content: text, Origin: llm.Origin{Source: source, PostedAt: posted, TakenAt: now()}}
 	}
 	withPlan := func(messages []llm.Message) []llm.Message {
-		if config.Plan == nil || config.SpawnedFrom != "" {
+		if config.Plan == nil {
 			return messages
 		}
 		shown := config.Plan()

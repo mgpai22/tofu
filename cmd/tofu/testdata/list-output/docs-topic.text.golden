@@ -248,8 +248,9 @@ Turn
     planEveryStep           true
       true or false
       the lead sees its plan, with each step's status, before every step of a
-      turn; off shows the plan only when the plan tool answers. A sub-agent
-      never gets it, and the next turn reads the new value
+      turn; off shows the plan only when the plan tool answers. Each sub-agent
+      keeps a plan of its own and sees that one, and the next turn reads the new
+      value
     sideChatAccess          read
       any text
       what a new side chat may write: read writes nothing, notes writes .md and

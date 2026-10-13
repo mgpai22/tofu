@@ -42,6 +42,11 @@ type Plan struct {
 
 func NewPlan() *Plan { return &Plan{} }
 
+func (p *Plan) ForAnotherAgent() (turn.Tool, func() string) {
+	own := NewPlan()
+	return own, own.Shown
+}
+
 func (p *Plan) Name() string { return PlanToolName }
 
 func (p *Plan) Definition() llm.Tool {
