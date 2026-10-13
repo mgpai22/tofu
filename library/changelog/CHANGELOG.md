@@ -10,6 +10,17 @@ The minor number carries breaking changes, which is what 0.x means, and **there 
 
 ## Unreleased
 
+## 0.5.11-fix2 - 2026-10-13
+
+Forks stop paying for the whole conversation again, and the settings screen gets a Projects section.
+
+### Fixed
+
+- A trim no longer runs right before a fork, and it only rewrites tool results near the end of the conversation, so the prompt cache survives: the request a fork makes now writes about a thousand tokens of cache where it wrote the whole conversation, 137k to 190k tokens. A session that cannot fork still trims enough to stay under its target.
+- The state an older tofu kept in a project's `.tofu` folder moves to the tofu home once, on the first open of the project, and a file already there is settled without asking: `sessions/HEAD` and cache entries keep the home's, a log day merges both, anything else keeps the old copy beside it. The warnings that repeated on every `tofu --continue` are gone.
+- An "always" answer to interpreter code (`python -c`, `node -e`, a heredoc, a script) covers only that exact code in that folder, and an "always allow" for code is never written to disk. Code fed to an interpreter on stdin or through a wrapper such as `uv run` or `env` now counts as a write tofu cannot place.
+- The settings screen and `tofu settings` have a Projects section with Boardy, Boardy flow, Scratchpad cleanup and Scratchpad size.
+
 ## 0.5.11-fix1 - 2026-10-12
 
 A board keeps every ticket's owns.
