@@ -90,6 +90,7 @@ func sameEvent(a, b Event) bool {
 
 type draft struct {
 	event *Event
+	id    string
 	lines func(*cardCache, Event, cardKey) []string
 }
 

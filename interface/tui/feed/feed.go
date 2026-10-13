@@ -202,7 +202,7 @@ func (m *Model) SetEvents(events []Event) {
 	if anchor < 0 {
 		return
 	}
-	id, into := s.drafts[anchor].event.ID, top-s.starts[anchor]
+	id, into := s.drafts[anchor].id, top-s.starts[anchor]
 	s = m.laid(m.depth(), id)
 	if at := s.index(id); at >= 0 {
 		m.scroll = max(0, s.rows-m.pageHeight()-s.starts[at]-into)

@@ -31,15 +31,15 @@ func (m Model) sheet() *sheet {
 	kept := m.retained()
 	s := &sheet{key: key, about: about, kept: len(kept)}
 	for index := range about[:lead] {
-		s.drafts = append(s.drafts, draft{&about[index], agentCardLines})
+		s.drafts = append(s.drafts, draft{&about[index], about[index].ID, agentCardLines})
 	}
 	for index := range kept {
 		if m.shows(kept[index]) {
-			s.drafts = append(s.drafts, draft{&kept[index], (*cardCache).cardLines})
+			s.drafts = append(s.drafts, draft{&kept[index], kept[index].ID, (*cardCache).cardLines})
 		}
 	}
 	for index := range about[lead:] {
-		s.drafts = append(s.drafts, draft{&about[lead+index], agentCardLines})
+		s.drafts = append(s.drafts, draft{&about[lead+index], about[lead+index].ID, agentCardLines})
 	}
 	s.heights, s.starts, s.frontier = make([]int, len(s.drafts)), make([]int, len(s.drafts)), len(s.drafts)
 	m.cards.sheet = s
@@ -50,7 +50,7 @@ func (s *sheet) index(id string) int {
 	if id == "" {
 		return -1
 	}
-	return slices.IndexFunc(s.drafts, func(d draft) bool { return d.event.ID == id })
+	return slices.IndexFunc(s.drafts, func(d draft) bool { return d.id == id })
 }
 
 func (m Model) laid(depth int, through string) *sheet {

@@ -610,7 +610,7 @@ func (a *App) forget(at int) {
 
 func (a *App) flushFeed() {
 	if a.feedStale && a.current == screenAgents {
-		a.feed.SetEvents(slices.Clone(a.happened))
+		a.feed.SetEvents(a.happened)
 		a.feedStale = false
 	}
 }
