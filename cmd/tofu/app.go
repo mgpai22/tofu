@@ -780,7 +780,7 @@ func (e *appEngine) Prepare(start host.Turn, hooks host.Hooks) (host.Prepared, e
 		prepared.Decisions = func() int { return gate.decisions }
 	}
 	config.Images = images
-	config.Person = person.Asking(func() bool { return settingText(e.dir, settingspkg.GatePrompt, say) == settingspkg.GatePromptAsk })
+	config.Person = person.Asking(config.GatePromptAsks)
 	prepared.Config, prepared.Spawner, prepared.Plan, prepared.Ceiling, prepared.Sessions, prepared.GateOff = config, spawner, plan, budget.CeilingTokens, sessions, gateErr
 	prepared.Account = spentAccount(opened.held, opened.selected.ID)
 	return prepared, nil

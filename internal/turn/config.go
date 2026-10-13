@@ -75,6 +75,7 @@ type Config struct {
 	Proxy           *CommandProxy
 	Boundary        *subagent.Boundary
 	Person          Person
+	GatePromptAsks  func() bool
 	Task            string
 	TaskOrigin      llm.Origin
 	Images          []llm.Image

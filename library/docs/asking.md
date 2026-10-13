@@ -18,6 +18,8 @@ A call carries 1 to 4 questions. Each has:
 - 2 to 4 options of 1 to 5 words, each with a description and an
   optional preview, for `choice` and `multi`
 - the option the lead recommends, for every type but `text`
+- `reversible`, set only when the recommended option can be undone later
+  at little cost
 
 It is never a request to run a tool. Approval belongs to the gate, and the
 two are kept apart.
@@ -39,7 +41,8 @@ a message under `auto`:
 
 - outcome: `submitted`; `cancelled`, you pressed Esc or the turn stopped,
   and the recommended option stands; `timed_out`, no answer in time under
-  auto; `undelivered`, nobody could be asked
+  auto; `undelivered`, nobody could be asked; `taken_in_auto`, the
+  question never reached you, see below
 - status: `answered`; `skipped`, you chose nothing; `unanswered`
 - a client of `tofu serve` sees it as a `tofu/askPerson` request; see
   `tofu docs serve`
@@ -62,7 +65,9 @@ waits:
   120 by default, the recommended option is taken, marked auto-selected
   after timeout, and the form stays open: an answer you give later still
   arrives, so it can correct course. A turn that ends with a question
-  open ends its report with it as a poll.
+  open ends its report with it as a poll. When every question is marked
+  `reversible` and the ask judge says proceed on each, the recommended
+  options are taken without showing you the form.
 - `ask`: the lead waits until you answer, with no timeout.
 
     tofu settings set gatePrompt ask
@@ -72,7 +77,10 @@ waits:
 
 Every question is a row in the decision ledger at the point `ask`, in
 shadow: tofu records what the typed decision would have done, and the
-code still decides by asking.
+code still decides by asking, except for a reversible recommendation under
+`auto`, whose row is written `enforced` because its verdict decides. A
+proceed takes the recommendation and the row's outcome reads
+`taken_in_auto`.
 
     tofu why --last 1 --point ask
 

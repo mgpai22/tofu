@@ -11,10 +11,12 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"tofu/internal/judge/gate"
 	"tofu/internal/judge/ledger"
 	"tofu/internal/konst"
 	"tofu/internal/llm"
 	"tofu/internal/subagent"
+	"tofu/internal/sys"
 	"tofu/internal/turn"
 )
 
@@ -25,6 +27,7 @@ const (
 	askCancelled   askOutcome = "cancelled"
 	askTimedOut    askOutcome = "timed_out"
 	askUndelivered askOutcome = "undelivered"
+	askTakenInAuto askOutcome = "taken_in_auto"
 )
 
 type askStatus string
@@ -92,6 +95,7 @@ func (AskPerson) Definition() llm.Tool {
 			"type":        map[string]any{"type": "string", "enum": []string{string(turn.QuestionChoice), string(turn.QuestionMulti), string(turn.QuestionText), string(turn.QuestionYesNo)}},
 			"options":     map[string]any{"type": "array", "items": option, "minItems": konst.AskPersonOptionsLeast, "maxItems": konst.AskPersonOptionsMost, "description": "for choice and multi; yesno is yes then no; text has none"},
 			"recommended": map[string]any{"type": "integer", "description": "the index of the option you would take; required for every type but text"},
+			"reversible":  map[string]any{"type": "boolean", "description": "true only when the recommended option can be undone later at little cost; leave it out otherwise"},
 		},
 		"required": []string{"id", "header", "question", "type"},
 	}
@@ -100,7 +104,7 @@ func (AskPerson) Definition() llm.Tool {
 		Description: "puts a decision only the person can make to them: a choice between libraries or designs, a matter of taste, spending money, something that cannot be undone. " +
 			"never for permission to run a tool; the gate asks that. one call at a time, 1 to " + strconv.Itoa(konst.AskPersonQuestionsMost) + " questions, each with options and the one you recommend. " +
 			"tofu adds a free-text other to every choice, so never write one. the answer says the outcome and, for each question, its status and what was chosen. " +
-			"in auto the work never stops on it: with no answer in time the recommended option is taken",
+			"in auto the work never stops on it: with no answer in time the recommended option is taken, and a reversible recommendation the ask judge agrees with is taken without asking",
 		Parameters: map[string]any{
 			"type":       "object",
 			"properties": map[string]any{"questions": map[string]any{"type": "array", "items": question, "minItems": 1, "maxItems": konst.AskPersonQuestionsMost}},
@@ -111,23 +115,43 @@ func (AskPerson) Definition() llm.Tool {
 
 func (a AskPerson) Run(ctx context.Context, raw json.RawMessage) (turn.Result, error) {
 	var args struct {
-		Questions []turn.PersonQuestion `json:"questions"`
+		Questions []struct {
+			turn.PersonQuestion
+			Reversible bool `json:"reversible"`
+		} `json:"questions"`
 	}
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return turn.Result{}, fmt.Errorf("ask_person: arguments are not the expected shape: %w", err)
 	}
-	if err := checkQuestions(args.Questions); err != nil {
+	questions, reversible := make([]turn.PersonQuestion, len(args.Questions)), true
+	for i, q := range args.Questions {
+		questions[i], reversible = q.PersonQuestion, reversible && q.Reversible && q.Recommended != nil
+	}
+	if err := checkQuestions(questions); err != nil {
 		return turn.Result{}, fmt.Errorf("ask_person: %w", err)
 	}
-	questions := args.Questions
 	for i := range questions {
 		questions[i].Options = optionsOf(questions[i])
 	}
-	recorded := make(chan []string, 1)
-	go func() { recorded <- a.recordShadow(context.WithoutCancel(ctx), questions) }()
 	auto := a.Auto()
 	if blocks, decided := turn.QuestionsBlockFrom(ctx); decided {
 		auto = !blocks
+	}
+	recorded := make(chan []string, 1)
+	if auto && reversible && a.Judge != nil {
+		acting := *a.Judge
+		acting.Rule.Mode = gate.ModeEnforced
+		a.Judge = &acting
+		ids := a.recordShadow(context.WithoutCancel(ctx), questions)
+		if proceeds(ids, len(questions)) {
+			taken := resolved(askTakenInAuto, questions, "the ask judge said proceed and the recommended option can be undone, so gatePrompt auto took it without asking the person")
+			a.backfill(ids, taken.Outcome)
+			shown, err := json.Marshal(taken)
+			return turn.Result{Content: string(shown)}, err
+		}
+		recorded <- ids
+	} else {
+		go func() { recorded <- a.recordShadow(context.WithoutCancel(ctx), questions) }()
 	}
 	replied := make(chan personReply, 1)
 	go func() { replied <- a.reply(ctx, raw, questions, auto) }()
@@ -271,6 +295,25 @@ func (a AskPerson) recordShadow(ctx context.Context, questions []turn.PersonQues
 		}
 	}
 	return ids
+}
+
+func proceeds(ids []string, asked int) bool {
+	dir, err := sys.LogDir()
+	if err != nil || len(ids) != asked {
+		return false
+	}
+	rows := ledger.NewReader(dir)
+	for _, id := range ids {
+		row, found, err := rows.ByID(id)
+		if err != nil || !found || row.Verdict != ledger.VerdictAllow || len(row.Answers) == 0 {
+			return false
+		}
+		judged, err := subagent.DecideAsk(row.Answers[0].Choice, row.Reason.Value, row.Reason.Threshold)
+		if err != nil || judged.Effective != subagent.ActionProceed {
+			return false
+		}
+	}
+	return true
 }
 
 func optionsOf(q turn.PersonQuestion) []turn.PersonOption {

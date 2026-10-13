@@ -32,8 +32,16 @@ type GateRequest struct {
 	Task   string
 	Tool   string
 	Args   json.RawMessage
+	Asked  json.RawMessage
 	Call   string
 	Code   *subagent.InlineCode
+}
+
+func (r GateRequest) written() json.RawMessage {
+	if r.Asked != nil {
+		return r.Asked
+	}
+	return r.Args
 }
 
 type GateDecision struct {
@@ -131,6 +139,22 @@ func (p Person) Asking(settingAsks func() bool) Person {
 		}
 		return p(ctx, request, decision)
 	}
+}
+
+func (c Config) gateAsks(ctx context.Context) bool {
+	if asks, decided := QuestionsBlockFrom(ctx); decided {
+		return asks
+	}
+	return c.GatePromptAsks == nil || c.GatePromptAsks()
+}
+
+func (c Config) gatePerson(ctx context.Context) Person {
+	if c.Person != nil || c.gateAsks(ctx) {
+		return c.Person
+	}
+	return Person(func(context.Context, GateRequest, GateDecision) (PersonAnswer, error) {
+		return PersonDenied, errors.New("no person was available to answer")
+	}).RunsWhatJevAsks()
 }
 
 const (
@@ -311,6 +335,10 @@ func (t *SpawnTool) orchestratorAnswers(held *heldSubAgent, site spawnSite) Pers
 			site.notice(id, id+"'s "+request.Tool+" call keeps to its own scratch folder, so it runs without asking the orchestrator")
 			return PersonNotAskedOwnScratch, nil
 		}
+		if !t.base.gateAsks(ctx) && decision.ID != "" && decision.Failure == "" && decision.HookAsk == "" && keepsToOwns(held.boundary, request) {
+			site.notice(id, id+"'s "+request.Tool+" call keeps inside its owns, and the lead's gatePrompt auto runs what the gate asks about there, so it runs without asking the orchestrator")
+			return PersonNotAsked, nil
+		}
 		because, place, answers := "the gate's verdict is ask"+standing(decision.Reason), CallPlace(request, t.Project), ""
 		switch {
 		case decision.HookAsk != "":
@@ -351,6 +379,38 @@ func keepsToScratch(boundary *subagent.Boundary, request GateRequest) bool {
 		return boundary.KeepsToScratch(args.Command)
 	}
 	return false
+}
+
+func keepsToOwns(boundary *subagent.Boundary, request GateRequest) bool {
+	var args struct{ Path, Command string }
+	if json.Unmarshal(request.written(), &args) != nil {
+		return false
+	}
+	owned := func(target string) bool {
+		if boundary.Scratched(target) {
+			return true
+		}
+		literal := !strings.ContainsAny(target, "$`~%") && !path.IsAbs(target) && !filepath.IsAbs(target)
+		return literal && subagent.Allow(target, boundary.Owns()) == nil
+	}
+	switch request.Tool {
+	case "write", "edit":
+		return owned(args.Path)
+	case bashToolName:
+		touched := 0
+		for _, step := range subagent.ShellSteps(args.Command) {
+			if !slices.Contains(localFilePrograms(), step.Program) || slices.ContainsFunc(step.Changes, func(changed string) bool { return !owned(changed) }) {
+				return false
+			}
+			touched += len(step.Changes)
+		}
+		return touched > 0
+	}
+	return false
+}
+
+func localFilePrograms() []string {
+	return []string{"rm", "rmdir", "mkdir", "touch", "cp", "mv", "unlink", "cat", "echo", "printf", "ls"}
 }
 
 func (s spawnSite) notice(agent, text string) {
@@ -517,7 +577,7 @@ func (e CodeEntry) Record() {
 
 func PersonOnly(project string, request GateRequest) bool {
 	var args struct{ Path, Command string }
-	if json.Unmarshal(request.Args, &args) != nil {
+	if json.Unmarshal(request.written(), &args) != nil {
 		return false
 	}
 	switch request.Tool {
@@ -543,24 +603,31 @@ func harnessFiles() []string {
 
 func readOnlyPrograms() []string {
 	return []string{"cat", "head", "tail", "less", "more", "grep", "egrep", "fgrep", "rg", "ls", "dir", "stat", "wc", "diff",
-		"cd", "pushd", "popd", "echo", "printf", "type", "file", "jq", "sha256sum", "md5sum", "realpath", "readlink", "test",
+		"cd", "pushd", "popd", "echo", "printf", "type", "file", "jq", "sha256sum", "md5sum", "realpath", "readlink", "test", "read",
 		"get-content", "gc", "select-string", "sls"}
 }
 
 func shellChangesTheHarness(project, command string) bool {
-	readsOnly := true
+	written, unparsed := subagent.ShellWrites(command)
+	understood := unparsed == nil
 	for _, step := range subagent.ShellSteps(command) {
-		if slices.ContainsFunc(step.Changes, func(changed string) bool { return reachesHarnessFile(project, changed) }) {
+		program, args := step.Program, step.Args
+		if program == "rtk" && len(args) > 0 {
+			program, args = args[0], args[1:]
+		}
+		helps := slices.Contains(args, "--help") || slices.Contains(args, "-h")
+		if program == "tofu" && !helps && (slices.Contains(args, "settings") && slices.Contains(args, "set") ||
+			slices.Contains(args, "hooks") && slices.Contains(args, "trust")) {
 			return true
 		}
-		if step.Program == "tofu" && (slices.Contains(step.Args, "settings") && slices.Contains(step.Args, "set") ||
-			slices.Contains(step.Args, "hooks") && slices.Contains(step.Args, "trust")) {
-			return true
-		}
-		readsOnly = readsOnly && len(step.Changes) == 0 && slices.Contains(readOnlyPrograms(), step.Program)
+		written = append(written, step.Changes...)
+		understood = understood && slices.Contains(readOnlyPrograms(), program)
+	}
+	if slices.ContainsFunc(written, func(changed string) bool { return reachesHarnessFile(project, changed) }) {
+		return true
 	}
 	lower := strings.ToLower(command)
-	return !readsOnly && slices.ContainsFunc(harnessFiles(), func(file string) bool {
+	return !understood && slices.ContainsFunc(harnessFiles(), func(file string) bool {
 		dir, _, _ := strings.Cut(file, "/")
 		return strings.Contains(lower, dir) && strings.Contains(lower, path.Base(file))
 	})
@@ -575,10 +642,16 @@ func reachesHarnessFile(project, written string) bool {
 			break
 		}
 	}
-	if !filepath.IsAbs(full) {
+	project, _ = filepath.Abs(project)
+	if !filepath.IsAbs(full) && !path.IsAbs(filepath.ToSlash(full)) {
 		full = filepath.Join(project, full)
 	}
-	names := []string{full}
+	names, roots := []string{full}, []string{project, home}
+	for _, root := range []string{project, home} {
+		if real, err := filepath.EvalSymlinks(root); err == nil {
+			roots = append(roots, real)
+		}
+	}
 	if real, err := filepath.EvalSymlinks(full); err == nil {
 		names = append(names, real)
 	}
@@ -586,25 +659,37 @@ func reachesHarnessFile(project, written string) bool {
 		names = append(names, filepath.Join(dir, filepath.Base(full)))
 	}
 	if target, err := os.Readlink(full); err == nil {
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(filepath.Dir(full), target)
+		}
 		names = append(names, target)
 	}
-	return slices.ContainsFunc(names, namesHarnessFile)
+	return slices.ContainsFunc(names, func(name string) bool {
+		return slices.ContainsFunc(roots, func(root string) bool { return namesHarnessFile(name, root) })
+	})
 }
 
-func namesHarnessFile(name string) bool {
-	segments := strings.Split(strings.ToLower(path.Clean(strings.ReplaceAll(name, `\`, "/"))), "/")
-	for i, segment := range segments {
-		segment, _, _ = strings.Cut(segment, ":")
-		segments[i] = strings.TrimRight(segment, ". ")
+func namesHarnessFile(name, root string) bool {
+	below, inside := strings.CutPrefix(comparablePath(name), comparablePath(root)+"/")
+	if !inside {
+		return false
 	}
-	named := "/" + strings.Join(segments, "/")
 	for _, file := range harnessFiles() {
 		parts := strings.Split(file, "/")
 		for k := range parts {
-			if strings.HasSuffix(named, "/"+strings.Join(parts[:k+1], "/")) {
+			if below == strings.Join(parts[:k+1], "/") {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+func comparablePath(name string) string {
+	segments := strings.Split(strings.ToLower(path.Clean(strings.ReplaceAll(name, `\`, "/"))), "/")
+	for i, segment := range segments {
+		segment, _, _ = strings.Cut(segment, ":")
+		segments[i] = strings.TrimRight(segment, ". ")
+	}
+	return "/" + strings.TrimLeft(strings.Join(segments, "/"), "/")
 }

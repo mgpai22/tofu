@@ -2,7 +2,7 @@
 title: Decision points
 description: Each place tofu can ask a classifier, what it decides, whether it is live or in shadow, and why.
 order: 2
-updated: 2026-10-04
+updated: 2026-10-13
 ---
 
 A decision point is one choice in the loop that a classifier can make. One
@@ -19,7 +19,7 @@ judged point is live or in shadow.
 | Tool gate | whether a tool call runs, asks or is refused | unwired by default | shadow, live under `gatePrompt ask` |
 | Read worth | which paragraphs of a message are worth reading | cheap | free arm |
 | Page sift | which parts of a fetched page to keep | unwired | off |
-| Ask gate | whether a sub-agent asks or proceeds at a moment of doubt | unwired | shadow |
+| Ask gate | whether a question the lead puts to you needs you | judged | shadow, live under `auto` for a reversible recommendation |
 | Instruction trust | whether outside text reads as an instruction | unwired | off |
 
 ## Why each point runs the way it does
@@ -40,7 +40,9 @@ Each point runs the way its measurements support.
   to `ask`, so you choose when a judgment can stop a call.
 - **Read worth**: a 15 word floor decides, with no call.
 - **Page sift**: the fetch step already strips what it would remove.
-- **Ask gate** runs in shadow and changes nothing a sub-agent does.
+- **Ask gate** runs in shadow, with one exception: under `gatePrompt auto`,
+  a question the lead marks reversible is answered with its recommended
+  option when the judge says proceed, and the row's outcome says so.
 - **Instruction trust** is off.
 
 The `search` tool has no classifier: code tries the word, case and Go
