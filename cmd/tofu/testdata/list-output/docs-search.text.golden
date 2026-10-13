@@ -1,6 +1,6 @@
 exit 0
 --- stdout
-Docs · "change the colours"                                           64 matches
+Docs · "change the colours"                                           65 matches
 
   change the colours
     → tofu settings set theme Nord
@@ -22,6 +22,8 @@ Docs · "change the colours"                                           64 matche
     → tofu docs browser
   Commands in the app
     → tofu docs commands
+  Context
+    → tofu docs context
   Cron, loops and goals
     → tofu docs cron
   The doctor

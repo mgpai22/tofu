@@ -174,6 +174,9 @@ func heldHandle(store *recall.Store, text string) (string, error) {
 		handle, _, _ := strings.Cut(held, " ")
 		return handle, nil
 	}
+	if store == nil {
+		return strings.Repeat("0", konst.ArtifactHandleBytesAtMost), nil
+	}
 	elided, err := recall.Elide(store, recall.Config{}, []byte(text), true)
 	return elided.Reference.ID, err
 }
@@ -260,6 +263,10 @@ func RecordCarried(store *session.Store, from string, compacted Compacted, at ti
 }
 
 func shrinkTo(artifacts Artifacts, messages []llm.Message, estimate, target int, cause shrinkCause) (overflowShrink, error) {
+	return shrinkFrom(artifacts, messages, estimate, target, 0, cause)
+}
+
+func shrinkFrom(artifacts Artifacts, messages []llm.Message, estimate, target, from int, cause shrinkCause) (overflowShrink, error) {
 	lastStep := len(messages) - 1
 	for lastStep >= 0 && messages[lastStep].Role != llm.RoleAssistant {
 		lastStep--
@@ -269,7 +276,7 @@ func shrinkTo(artifacts Artifacts, messages []llm.Message, estimate, target int,
 		if estimate <= target {
 			break
 		}
-		if message.Role == llm.RoleTool && len(message.Images) > 0 {
+		if i >= from && message.Role == llm.RoleTool && len(message.Images) > 0 {
 			estimate -= dropPicture(&messages[i]) - artifacts.preview.Tokens("\n"+pictureDropped)
 			shrink.results++
 		}
@@ -286,7 +293,7 @@ func shrinkTo(artifacts Artifacts, messages []llm.Message, estimate, target int,
 		if estimate <= target {
 			break
 		}
-		if message.Role != llm.RoleTool || len(message.Content) < artifacts.preview.CompactFloorBytes ||
+		if i < from || message.Role != llm.RoleTool || len(message.Content) < artifacts.preview.CompactFloorBytes ||
 			recall.AlreadyDropped(message.Content) || shrunkHandle(message.Content) != "" {
 			continue
 		}
@@ -534,12 +541,23 @@ func tailStart(preview recall.Config, messages []llm.Message, room int) int {
 	return start
 }
 
-func trimRead(artifacts Artifacts, budget recall.Budget, step int, messages []llm.Message) (*Compaction, overflowShrink, error) {
+func warmFrom(preview recall.Config, messages []llm.Message) int {
+	after := 0
+	for i := len(messages) - 1; i >= 0; i-- {
+		if after > konst.TrimWarmSuffixTokens {
+			return i + 1
+		}
+		after += HistoryTokens(preview, messages[i:i+1])
+	}
+	return 0
+}
+
+func trimRead(artifacts Artifacts, budget recall.Budget, step int, messages []llm.Message, from int) (*Compaction, overflowShrink, error) {
 	tokens := budget.Tokens(artifacts.preview, historyOf(messages))
 	if tokens <= budget.Bands.Target() {
 		return nil, overflowShrink{}, nil
 	}
-	shrink, err := shrinkTo(artifacts, messages, tokens, budget.Bands.Target()*konst.ContextTrimPercentOfTarget/100, causeBudget)
+	shrink, err := shrinkFrom(artifacts, messages, tokens, budget.Bands.Target()*konst.ContextTrimPercentOfTarget/100, from, causeBudget)
 	if err != nil || shrink.results == 0 {
 		return nil, shrink, err
 	}

@@ -2,7 +2,7 @@
 title: Context
 description: How tofu keeps a conversation small and cheap to resend, from the cached prompt prefix to forks that carry the conversation and point back at every call.
 order: 5
-updated: 2026-10-09
+updated: 2026-10-12
 ---
 
 Everything the model sees on a step is resent on the next one. tofu manages
@@ -17,7 +17,7 @@ judgment:
 | **Middle elision** | What the model reads of a large result is its two ends, with a marker saying how many bytes were left out and where they are |
 | **Memo of repeated calls** | A read, glob, search or fetch repeated in a turn, with nothing written since, is answered from memory |
 | **Browser pages** | Past 4 whole page snapshots in a conversation, older ones shrink to a 600 byte summary and a handle, keeping 2 whole |
-| **Trim before fork** | When the conversation crosses the target, results the model has already read are shrunk to a handle, pictures first and then oldest first, down to 80% of the target, and the fork comes only if that is not enough |
+| **Cache-aware trim** | When the conversation crosses the target, results the model has already read are shrunk to a handle only where the cache allows it, and only when that brings the conversation down to 80% of the target; otherwise the fork takes it |
 | **Forks and their carry** | Past the target, the session ends whole and a new one starts with the task once, the episode view of the conversation, every message you typed, word for word, and a list of what was read, each naming the call that holds it |
 | **Recall** | `lookup` returns any call the carry names, with its result, from any session of the line; `artifact_fetch` reads any range of any handle |
 | **Pictures** | A picture a tool read counts as 1,600 tokens, only the newest 20 are sent, and a shrink drops pictures, oldest first, before any text |
@@ -42,8 +42,10 @@ the window for the answer and forks at 80% of the rest, so a 200,000 token
 model forks at 144,000. A million-token window does not make a million-token
 conversation cheap, so the usable window is capped at 250,000 and no model
 forks later than 200,000. A model with no known window uses 63,000, a quarter
-of that cap. Separately, a request larger than the model's own window is
-refused before it is sent.
+of that cap. No request past the ceiling is sent: tofu forks, or shrinks
+old results, before it, and refuses the request when neither brings it
+under. Separately, a request larger than the model's own window is refused
+before it is sent.
 
 **Handles instead of text.** A full listing or a long log is mostly noise
 after the first read. Storing it and sending its ends keeps the step small,
@@ -70,10 +72,21 @@ On a driven chain of 30 reads at a 60,000 token ceiling, the share of the
 first 20 reads after a fork that repeated one from just before it went from
 12.0% to 8.7%.
 
-**A trim comes before a fork.** A fork starts a new session and rewrites the
-whole cache, so when the conversation crosses its target tofu first shrinks
-results the model has already read, and forks only when that does not bring
-it under. A result that has just come back is never cut before the model
+**A trim never breaks the cache it is meant to save.** Shrinking a result
+changes every byte after it, so the provider writes all of that again. tofu
+shrinks a result only when less than 8,000 tokens follow it, or when the
+session has been idle for 90 minutes, longer than the one-hour cache lives,
+or when the next request would otherwise go over the ceiling. A trim runs
+only when it brings the conversation down to 80% of the target, so it does
+not fire again a few steps later. When it cannot, nothing is shrunk and the
+fork comes instead, asking for the working state on exactly the history the
+last step sent, which the provider reads from cache. Where no fork can
+come, on a run with forks off or a history no fork can shrink, the trim
+still brings the conversation under the target, shrinking the newest
+results first, which leaves the longest prefix in cache. On a driven sub-agent
+run that forks once, the requests' prefixes show that request reading
+179,369 tokens from cache and writing 955, where a trim first made it write
+180,125. A result that has just come back is never cut before the model
 reads it.
 
 **Your words are carried, not summarised.** Every fork's carry lists what

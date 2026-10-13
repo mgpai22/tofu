@@ -46,6 +46,9 @@ const (
 	ForkStateWords      = 1200
 
 	ContextTrimPercentOfTarget = 80
+	TrimWarmSuffixTokens       = 8000
+	TrimColdAfterIdleMinutes   = 90
+	ArtifactHandleBytesAtMost  = 64
 
 	ImageTokens      = 1600
 	ImageResultsKept = 20

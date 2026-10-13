@@ -9,6 +9,7 @@ import (
 	"math"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -303,6 +304,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 	sentTokens := func(messages []llm.Message) int {
 		return budget.Tokens(artifacts.preview, historyOf(messages))
 	}
+	var lastAnswered time.Time
 	ask := func(ctx context.Context, why string, request llm.Request) (llm.Decision, requestTiming, string, error) {
 		id, started := session.NewEventID(), time.Now()
 		if tokens := sentTokens(request.Messages); tokens > budget.Ceiling() {
@@ -313,6 +315,9 @@ func Run(ctx context.Context, config Config) (Row, error) {
 		tapped, tap := llm.Tapped(ctx)
 		decision, timing, err := askCountingAttempts(tapped, model, request)
 		recorded.exchange(id, why, config.Wire, request, started, tap.Attempts(), decision, err)
+		if err == nil {
+			lastAnswered = now()
+		}
 		return decision, timing, id, err
 	}
 	inserted := func(source, text string, posted time.Time) llm.Message {
@@ -326,17 +331,41 @@ func Run(ctx context.Context, config Config) (Row, error) {
 			messages = append(messages, inserted(sourceSessionStartHook, said, time.Time{}))
 		}
 	}
-	trim := func(step int, when string) (*Compaction, error) {
-		if config.NoCompaction || !budget.Automatic {
-			return nil, nil
-		}
+	trims := !config.NoCompaction && budget.Automatic
+	trimFrom := func(step int, when string, from int) (*Compaction, error) {
 		before := slices.Clone(messages)
-		compaction, shrink, err := trimRead(artifacts, budget, step, messages)
+		compaction, shrink, err := trimRead(artifacts, budget, step, messages, from)
 		if compaction != nil {
 			recorded.listChange("compaction", when+": the conversation crossed its budget, so tofu "+shrink.String(), before, messages)
 			compacted()
 		}
 		return compaction, err
+	}
+	landsFrom := func(step, from, tokens int) bool {
+		holdingNothing := Artifacts{preview: artifacts.preview, handles: artifacts.handles}
+		reached, _, err := trimRead(holdingNothing, budget, step, slices.Clone(messages), from)
+		return err == nil && reached != nil && reached.TokensAfter <= tokens
+	}
+	trimUnderTarget := func(step int, when string) (*Compaction, error) {
+		if !trims || sentTokens(messages) <= budget.Bands.Target() {
+			return nil, nil
+		}
+		firstMissing := sort.Search(len(messages)+1, func(from int) bool { return !landsFrom(step, from, budget.Bands.Target()) })
+		return trimFrom(step, when, max(firstMissing-1, 0))
+	}
+	trim := func(step int, when string) (*Compaction, error) {
+		if !trims {
+			return nil, nil
+		}
+		from := 0
+		cacheWarm := lastAnswered.IsZero() || now().Sub(lastAnswered) < konst.TrimColdAfterIdleMinutes*time.Minute
+		if cacheWarm && sentTokens(messages) <= budget.Ceiling() {
+			from = warmFrom(artifacts.preview, messages)
+		}
+		if !landsFrom(step, from, budget.Bands.Target()*konst.ContextTrimPercentOfTarget/100) {
+			return nil, nil
+		}
+		return trimFrom(step, when, from)
 	}
 	stateCarried := func(fork *Fork, step int, beforeFork, begun []llm.Message, tools []llm.Tool) ([]llm.Message, string) {
 		if keeper != nil {
@@ -568,27 +597,32 @@ func Run(ctx context.Context, config Config) (Row, error) {
 		}
 		budget = budget.Sending(artifacts.preview, string(schemas))
 		before := "before step " + strconv.Itoa(step)
-		due := step == 1 && len(config.History) > 0 || sentTokens(messages) > budget.Ceiling()
-		if due {
-			if _, err := trim(step, before); err != nil {
+		var trimmedBefore *Compaction
+		if due := step == 1 && len(config.History) > 0 || sentTokens(messages) > budget.Ceiling(); due {
+			if trimmedBefore, err = trim(step, before); err != nil {
 				return fail(err)
 			}
-		}
-		if due && !config.NoFork {
-			beforeFork := slices.Clone(messages)
-			fork, begun, err := forkHistory(artifacts, budget, config.FirstUserMessage(), messages, "", forks+1, config.Caps.MaxForks)
+			if !config.NoFork {
+				beforeFork := slices.Clone(messages)
+				fork, begun, err := forkHistory(artifacts, budget, config.FirstUserMessage(), messages, "", forks+1, config.Caps.MaxForks)
+				if err != nil {
+					return fail(err)
+				}
+				if fork != nil {
+					forks++
+					fork.Into = origin + "-f" + strconv.Itoa(forks+1)
+					begun, missing := stateCarried(fork, step, beforeFork, begun, definitions)
+					forkInto(fork, before, beforeFork, begun, nil)
+					if missing != "" {
+						row.Warnings = append(row.Warnings, missing)
+					}
+				}
+			}
+			unforked, err := trimUnderTarget(step, before)
 			if err != nil {
 				return fail(err)
 			}
-			if fork != nil {
-				forks++
-				fork.Into = origin + "-f" + strconv.Itoa(forks+1)
-				begun, missing := stateCarried(fork, step, beforeFork, begun, definitions)
-				forkInto(fork, before, beforeFork, begun, nil)
-				if missing != "" {
-					row.Warnings = append(row.Warnings, missing)
-				}
-			}
+			trimmedBefore = cmp.Or(unforked, trimmedBefore)
 		}
 		keepNewestPictures(messages)
 		asSent := recall.Measure(artifacts.preview, budget.Bands, historyOf(messages))
@@ -629,6 +663,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 		budget = budget.Reported(reported, asSent)
 
 		stepRow := stepFrom(requestID, step, timing, decision)
+		stepRow.Compaction = trimmedBefore
 		answering = stepRow.id
 		measuredAgainst := budget.Bands
 		stepRow.Occupancy, stepRow.Bands = &asSent, &measuredAgainst
@@ -853,23 +888,27 @@ func Run(ctx context.Context, config Config) (Row, error) {
 				answered(decision.Content)
 				return finish(OutcomeStopped), nil
 			}
-			if stepRow.Compaction, err = trim(step, "after step "+strconv.Itoa(step)); err != nil {
-				keep(stepRow)
-				return fail(err)
+			var moved *Account
+			forced := ForkKind("")
+			if config.Accounts.Next != nil && !config.NoFork {
+				next, spent, nextErr := config.Accounts.Next(ctx, account)
+				switch {
+				case nextErr != nil:
+					row.Warnings = append(row.Warnings,
+						"the pinned account's windows could not be read, so this session stays on it: "+nextErr.Error())
+				case spent:
+					moved, forced = &next, ForkAccountSpent
+				}
+			}
+			if forced == "" {
+				trimmedAfter, err := trim(step, "after step "+strconv.Itoa(step))
+				stepRow.Compaction = cmp.Or(trimmedAfter, stepRow.Compaction)
+				if err != nil {
+					keep(stepRow)
+					return fail(err)
+				}
 			}
 			if !config.NoFork {
-				var moved *Account
-				forced := ForkKind("")
-				if config.Accounts.Next != nil {
-					next, spent, nextErr := config.Accounts.Next(ctx, account)
-					switch {
-					case nextErr != nil:
-						row.Warnings = append(row.Warnings,
-							"the pinned account's windows could not be read, so this session stays on it: "+nextErr.Error())
-					case spent:
-						moved, forced = &next, ForkAccountSpent
-					}
-				}
 				beforeFork := slices.Clone(messages)
 				fork, begun, err := forkHistory(artifacts, budget, config.FirstUserMessage(), messages, forced, forks+1, config.Caps.MaxForks)
 				if err == nil {
@@ -897,7 +936,12 @@ func Run(ctx context.Context, config Config) (Row, error) {
 					continue
 				}
 			}
+			unforked, err := trimUnderTarget(step, "after step "+strconv.Itoa(step))
+			stepRow.Compaction = cmp.Or(unforked, stepRow.Compaction)
 			keep(stepRow)
+			if err != nil {
+				return fail(err)
+			}
 
 		case llm.OutcomeRefusal:
 			keep(stepRow)

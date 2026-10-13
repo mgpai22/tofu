@@ -43,6 +43,11 @@ exit 0
         "summary": "every slash command the app's composer takes, how /compact shrinks the history the next turn carries, and how /undo puts files back"
       },
       {
+        "topic": "context",
+        "title": "Context",
+        "summary": "how a long conversation stays under its target, when old results are trimmed, when a session forks, and why neither breaks the prompt cache"
+      },
+      {
         "topic": "cron",
         "title": "Cron, loops and goals",
         "summary": "jobs that post a prompt into the session on a timer or after each turn, how to change one, and the history of every change"
