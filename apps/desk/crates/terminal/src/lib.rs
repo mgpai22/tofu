@@ -3,12 +3,14 @@ mod mouse;
 mod paint;
 mod palette;
 mod pty;
+mod scrollbar;
 
 use crate::keys::{KeyInput, key_input};
 use crate::mouse::Cell;
 use crate::paint::Frame;
 pub use crate::palette::Palette;
 use crate::pty::{Output, Pty};
+use crate::scrollbar::Scrollback;
 use alacritty_terminal::event::{Event, EventListener, WindowSize};
 use alacritty_terminal::grid::{Dimensions, Scroll};
 use alacritty_terminal::index::{Column, Line, Point as GridPoint};
@@ -17,18 +19,19 @@ use alacritty_terminal::term::color::COUNT;
 use alacritty_terminal::term::test::TermSize;
 use alacritty_terminal::term::{Config, Term, TermMode};
 use alacritty_terminal::vte::ansi::Processor;
-use desk_core::limits::TERMINAL_SCROLLBACK_LINES;
-use futures::StreamExt;
+use desk_core::limits::{TERMINAL_CURSOR_BLINK, TERMINAL_SCROLLBACK_LINES};
+use flume::Receiver;
 use gpui::{
-    App, Bounds, ClipboardItem, Context, ElementInputHandler, EntityInputHandler, EventEmitter,
-    FocusHandle, Focusable, IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent,
-    MouseUpEvent, Pixels, Point, Render, ScrollWheelEvent, SharedString, Size, Task,
-    UTF16Selection, Window, canvas, div, prelude::*, px, size,
+    App, Bounds, ClipboardItem, Context, DispatchPhase, ElementInputHandler, EntityInputHandler,
+    EventEmitter, FocusHandle, Focusable, IntoElement, KeyDownEvent, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, PaintQuad, Pixels, Point, Render, Result, ScrollWheelEvent,
+    SharedString, Size, Task, UTF16Selection, Window, canvas, div, prelude::*, px, size,
 };
 use std::cell::RefCell;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::time::Instant;
 
 const INITIAL_COLS: u16 = 80;
 const INITIAL_ROWS: u16 = 24;
@@ -66,15 +69,23 @@ pub struct Terminal {
     title: Option<SharedString>,
     palette: Palette,
     grid: (u16, u16),
+    sized: bool,
     cell: Size<Pixels>,
-    origin: Point<Pixels>,
+    bounds: Bounds<Pixels>,
     drawn: Option<Rc<Frame>>,
+    frame_owed: bool,
     focused: bool,
+    cursor_lit: bool,
     pressed_at: Option<Point<Pixels>>,
+    grabbed: Option<Pixels>,
     hovered: Option<Cell>,
     scrolled: f32,
+    last_output: Option<Instant>,
+    sync_at: Option<Instant>,
     focus: FocusHandle,
     _pump: Option<Task<()>>,
+    _sync: Option<Task<Result<()>>>,
+    _blink: Option<Task<Result<()>>>,
 }
 
 impl EventEmitter<TerminalEvent> for Terminal {}
@@ -87,11 +98,17 @@ fn blank_term(grid: (u16, u16), events: Events) -> Term<Events> {
     Term::new(config, &TermSize::new(grid.0.into(), grid.1.into()), events)
 }
 
+async fn next_batch(output: &Receiver<Output>) -> Option<Vec<Output>> {
+    let mut batch = vec![output.recv_async().await.ok()?];
+    batch.extend(output.drain());
+    Some(batch)
+}
+
 impl Terminal {
     pub fn new(cwd: &Path, cx: &mut Context<Self>) -> Self {
         let events = Events::default();
         let grid = (INITIAL_COLS, INITIAL_ROWS);
-        let mut terminal = Terminal {
+        Terminal {
             term: blank_term(grid, events.clone()),
             parser: Processor::new(),
             events,
@@ -101,18 +118,24 @@ impl Terminal {
             title: None,
             palette: Palette::default(),
             grid,
+            sized: false,
             cell: size(px(1.), px(1.)),
-            origin: Point::default(),
+            bounds: Bounds::default(),
             drawn: None,
+            frame_owed: false,
             focused: false,
+            cursor_lit: true,
             pressed_at: None,
+            grabbed: None,
             hovered: None,
             scrolled: 0.,
+            last_output: None,
+            sync_at: None,
             focus: cx.focus_handle(),
             _pump: None,
-        };
-        terminal.start(cx);
-        terminal
+            _sync: None,
+            _blink: None,
+        }
     }
 
     pub fn set_palette(&mut self, palette: Palette, cx: &mut Context<Self>) {
@@ -134,13 +157,18 @@ impl Terminal {
         self.title.clone()
     }
 
+    pub fn last_output(&self) -> Option<Instant> {
+        self.last_output
+    }
+
     pub fn restart(&mut self, cx: &mut Context<Self>) {
         self.term = blank_term(self.grid, self.events.clone());
         self.parser = Processor::new();
         self.scrolled = 0.;
+        self.sync_at = None;
+        self._sync = None;
         self.retitle(None, cx);
         self.start(cx);
-        cx.emit(TerminalEvent::Started);
         self.redraw(cx);
     }
 
@@ -150,13 +178,16 @@ impl Terminal {
     }
 
     fn start(&mut self, cx: &mut Context<Self>) {
-        match Pty::spawn(&self.shell, &self.cwd, self.grid.0, self.grid.1) {
-            Ok((pty, mut output)) => {
+        let (cols, rows) = self.grid;
+        match Pty::spawn(&self.shell, &self.cwd, cols, rows) {
+            Ok((pty, output)) => {
+                eprintln!("terminal: pty opened at {cols}x{rows}");
                 self.pty = Some(pty);
+                cx.emit(TerminalEvent::Started);
                 self._pump = Some(cx.spawn(async move |this, cx| {
-                    while let Some(output) = output.next().await {
+                    while let Some(batch) = next_batch(&output).await {
                         if this
-                            .update(cx, |terminal, cx| terminal.receive(output, cx))
+                            .update(cx, |terminal, cx| terminal.receive(batch, cx))
                             .is_err()
                         {
                             return;
@@ -172,21 +203,66 @@ impl Terminal {
         }
     }
 
-    fn receive(&mut self, output: Output, cx: &mut Context<Self>) {
-        match output {
-            Output::Bytes(bytes) => self.feed(&bytes, cx),
-            Output::Exited(code) => {
-                self.pty = None;
-                let shown = code.map_or_else(|| "unknown".to_owned(), |code| code.to_string());
-                self.feed(
-                    format!("\r\n[shell exited with code {shown}, press Enter for a new shell]")
+    fn receive(&mut self, batch: Vec<Output>, cx: &mut Context<Self>) {
+        self.end_sync_when_due(cx);
+        for output in batch {
+            match output {
+                Output::Bytes(bytes) => self.parser.advance(&mut self.term, &bytes),
+                Output::Exited(code) => {
+                    self.pty = None;
+                    let shown = code.map_or_else(|| "unknown".to_owned(), |code| code.to_string());
+                    self.feed(
+                        format!(
+                            "\r\n[shell exited with code {shown}, press Enter for a new shell]"
+                        )
                         .as_bytes(),
-                    cx,
-                );
-                cx.emit(TerminalEvent::Exited(code));
+                        cx,
+                    );
+                    cx.emit(TerminalEvent::Exited(code));
+                }
             }
         }
-        self.redraw(cx);
+        self.answer(cx);
+        self.watch_sync(cx);
+        self.last_output = Some(Instant::now());
+        self.drawn = None;
+        if !self.frame_owed {
+            self.frame_owed = true;
+            cx.notify();
+        }
+    }
+
+    fn watch_sync(&mut self, cx: &mut Context<Self>) {
+        let due = self.parser.sync_timeout().sync_timeout();
+        if due == self.sync_at {
+            return;
+        }
+        self.sync_at = due;
+        self._sync = due.map(|due| {
+            cx.spawn(async move |this, cx| {
+                let wait = due.saturating_duration_since(Instant::now());
+                cx.background_executor().timer(wait).await;
+                this.update(cx, |terminal, cx| {
+                    terminal.sync_at = None;
+                    terminal.end_sync_when_due(cx);
+                    terminal.watch_sync(cx);
+                })
+            })
+        });
+    }
+
+    fn end_sync_when_due(&mut self, cx: &mut Context<Self>) {
+        let now = Instant::now();
+        if self
+            .parser
+            .sync_timeout()
+            .sync_timeout()
+            .is_some_and(|due| due <= now)
+        {
+            self.parser.stop_sync(&mut self.term);
+            self.answer(cx);
+            self.redraw(cx);
+        }
     }
 
     fn feed(&mut self, bytes: &[u8], cx: &mut Context<Self>) {
@@ -263,20 +339,31 @@ impl Terminal {
         }
     }
 
-    fn frame(&mut self, bounds: Bounds<Pixels>, cell: Size<Pixels>) -> Rc<Frame> {
+    fn frame(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        cell: Size<Pixels>,
+        cx: &mut Context<Self>,
+    ) -> Rc<Frame> {
         let cols = (bounds.size.width / cell.width).floor().max(MIN_COLS) as u16;
         let rows = (bounds.size.height / cell.height).floor().max(MIN_ROWS) as u16;
-        self.origin = bounds.origin;
+        self.bounds = bounds;
         self.cell = cell;
+        self.frame_owed = false;
         if self.grid != (cols, rows) {
             self.grid = (cols, rows);
             self.drawn = None;
             self.term.resize(TermSize::new(cols.into(), rows.into()));
-            if let Some(pty) = &self.pty
-                && let Err(error) = pty.resize(cols, rows)
-            {
-                eprintln!("{error}");
+            if let Some(pty) = &self.pty {
+                match pty.resize(cols, rows) {
+                    Ok(()) => eprintln!("terminal: grid and pty resized to {cols}x{rows}"),
+                    Err(error) => eprintln!("{error}"),
+                }
             }
+        }
+        if !self.sized {
+            self.sized = true;
+            self.start(cx);
         }
         if let Some(frame) = &self.drawn {
             return frame.clone();
@@ -285,9 +372,24 @@ impl Terminal {
             self.term.renderable_content(),
             &self.palette,
             self.focused,
+            self.cursor_lit,
         ));
         self.drawn = Some(frame.clone());
         frame
+    }
+
+    fn scrollback(&self) -> Scrollback {
+        let grid = self.term.grid();
+        Scrollback {
+            offset: grid.display_offset(),
+            history: grid.history_size(),
+            rows: grid.screen_lines(),
+        }
+    }
+
+    fn thumb(&self) -> Option<PaintQuad> {
+        scrollbar::thumb(self.bounds, px(PADDING), self.scrollback())
+            .map(|thumb| scrollbar::quad(thumb, self.grabbed.is_some(), self.palette.foreground))
     }
 
     fn selected(&self) -> bool {
@@ -315,7 +417,7 @@ impl Terminal {
         } else {
             text
         };
-        self.type_bytes(text.into_bytes());
+        self.type_bytes(text.into_bytes(), cx);
     }
 
     fn key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
@@ -325,7 +427,7 @@ impl Terminal {
         }
         match key_input(&event.keystroke, *self.term.mode(), self.selected()) {
             Some(KeyInput::Scroll(scroll)) => self.scroll(scroll, cx),
-            Some(KeyInput::Send(bytes)) => self.type_bytes(bytes),
+            Some(KeyInput::Send(bytes)) => self.type_bytes(bytes, cx),
             Some(KeyInput::Paste) => self.paste(cx),
             Some(KeyInput::Copy) => self.copy(cx),
             None => return,
@@ -334,10 +436,26 @@ impl Terminal {
         self.redraw(cx);
     }
 
-    fn type_bytes(&mut self, bytes: Vec<u8>) {
+    fn type_bytes(&mut self, bytes: Vec<u8>, cx: &mut Context<Self>) {
         self.term.selection = None;
         self.term.scroll_display(Scroll::Bottom);
         self.send(bytes);
+        if self.focused {
+            self.blink(cx);
+        }
+    }
+
+    fn blink(&mut self, cx: &mut Context<Self>) {
+        self.cursor_lit = true;
+        self._blink = Some(cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor().timer(TERMINAL_CURSOR_BLINK).await;
+                this.update(cx, |terminal, cx| {
+                    terminal.cursor_lit = !terminal.cursor_lit;
+                    terminal.redraw(cx);
+                })?;
+            }
+        }));
     }
 
     fn scroll(&mut self, scroll: Scroll, cx: &mut Context<Self>) {
@@ -346,7 +464,7 @@ impl Terminal {
     }
 
     fn cell_at(&self, position: Point<Pixels>) -> Cell {
-        mouse::cell_at(position - self.origin, self.cell, self.grid)
+        mouse::cell_at(position - self.bounds.origin, self.cell, self.grid)
     }
 
     fn grid_point(&self, at: Cell) -> GridPoint {
@@ -369,9 +487,34 @@ impl Terminal {
             }
             return;
         }
-        if event.button != MouseButton::Left {
-            return;
+        match event.button {
+            MouseButton::Left
+                if scrollbar::rail(self.bounds, px(PADDING)).contains(&event.position) =>
+            {
+                self.press_rail(event.position.y, cx)
+            }
+            MouseButton::Left => self.press_text(event, at),
+            MouseButton::Right if self.selected() => self.copy(cx),
+            MouseButton::Right | MouseButton::Middle => self.paste(cx),
+            MouseButton::Navigate(_) => return,
         }
+        self.redraw(cx);
+    }
+
+    fn press_rail(&mut self, y: Pixels, cx: &mut Context<Self>) {
+        let Some(thumb) = scrollbar::thumb(self.bounds, px(PADDING), self.scrollback()) else {
+            return;
+        };
+        if y < thumb.top() {
+            self.scroll(Scroll::PageUp, cx);
+        } else if y > thumb.bottom() {
+            self.scroll(Scroll::PageDown, cx);
+        } else {
+            self.grabbed = Some(y - thumb.top());
+        }
+    }
+
+    fn press_text(&mut self, event: &MouseDownEvent, at: Cell) {
         self.pressed_at = Some(event.position);
         let kind = match event.click_count {
             0 | 1 => SelectionType::Simple,
@@ -383,28 +526,49 @@ impl Terminal {
             (SelectionType::Simple, true, Some(selection)) => selection.update(point, at.side),
             _ => self.term.selection = Some(Selection::new(kind, point, at.side)),
         }
-        self.redraw(cx);
     }
 
-    fn mouse_move(&mut self, event: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
+    fn mouse_move(&mut self, event: &MouseMoveEvent, _: &mut Window, _: &mut Context<Self>) {
         let mode = *self.term.mode();
         let at = self.cell_at(event.position);
-        if mouse::reporting(mode, event.modifiers.shift) {
-            if self.hovered.replace(at) != Some(at)
-                && let Some(report) =
-                    mouse::move_report(at, event.pressed_button, event.modifiers, mode)
-            {
-                self.send(report);
-            }
+        if mouse::reporting(mode, event.modifiers.shift)
+            && self.hovered.replace(at) != Some(at)
+            && let Some(report) =
+                mouse::move_report(at, event.pressed_button, event.modifiers, mode)
+        {
+            self.send(report);
+        }
+    }
+
+    fn drag(&mut self, event: &MouseMoveEvent, cx: &mut Context<Self>) {
+        if let Some(grabbed) = self.grabbed {
+            let back = self.scrollback();
+            let target = scrollbar::offset_at(self.bounds, back, event.position.y - grabbed);
+            let delta = i32::try_from(target)
+                .unwrap_or(i32::MAX)
+                .saturating_sub(i32::try_from(back.offset).unwrap_or(i32::MAX));
+            self.scroll(Scroll::Delta(delta), cx);
+            return self.redraw(cx);
+        }
+        if mouse::reporting(*self.term.mode(), event.modifiers.shift) {
             return;
         }
-        let Some(pressed_at) = self.pressed_at.filter(|_| event.dragging()) else {
+        let Some(pressed_at) = self.pressed_at else {
             return;
         };
         let moved = event.position - pressed_at;
         if moved.x.abs().max(moved.y.abs()) <= px(DRAG_THRESHOLD) && !self.selected() {
             return;
         }
+        let y = event.position.y;
+        let above = ((self.bounds.top() - y) / self.cell.height).ceil();
+        let below = ((y - self.bounds.bottom()) / self.cell.height).ceil();
+        if above > 0. {
+            self.scroll(Scroll::Delta(above as i32), cx);
+        } else if below > 0. {
+            self.scroll(Scroll::Delta(-(below as i32)), cx);
+        }
+        let at = self.cell_at(event.position);
         let point = self.grid_point(at);
         if let Some(selection) = self.term.selection.as_mut() {
             selection.update(point, at.side);
@@ -412,8 +576,11 @@ impl Terminal {
         }
     }
 
-    fn mouse_up(&mut self, event: &MouseUpEvent, _: &mut Window, _: &mut Context<Self>) {
+    fn mouse_up(&mut self, event: &MouseUpEvent, _: &mut Window, cx: &mut Context<Self>) {
         self.pressed_at = None;
+        if self.grabbed.take().is_some() {
+            self.redraw(cx);
+        }
         let mode = *self.term.mode();
         if mouse::reporting(mode, event.modifiers.shift)
             && let Some(report) = mouse::button_report(
@@ -450,12 +617,18 @@ impl Terminal {
         }
     }
 
-    fn track_focus(&mut self, focused: bool) {
+    fn track_focus(&mut self, focused: bool, cx: &mut Context<Self>) {
         if self.focused == focused {
             return;
         }
         self.focused = focused;
         self.drawn = None;
+        if focused {
+            self.blink(cx);
+        } else {
+            self._blink = None;
+            self.cursor_lit = true;
+        }
         if self.term.mode().contains(TermMode::FOCUS_IN_OUT) {
             self.send(if focused { FOCUS_IN } else { FOCUS_OUT }.to_vec());
         }
@@ -502,7 +675,7 @@ impl EntityInputHandler for Terminal {
         cx: &mut Context<Self>,
     ) {
         if !text.is_empty() && self.pty.is_some() {
-            self.type_bytes(text.as_bytes().to_vec());
+            self.type_bytes(text.as_bytes().to_vec(), cx);
             self.redraw(cx);
         }
     }
@@ -539,10 +712,12 @@ impl EntityInputHandler for Terminal {
 
 impl Render for Terminal {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.frame_owed = false;
         let focused = self.focus.is_focused(window);
-        self.track_focus(focused);
+        self.track_focus(focused, cx);
         let terminal = cx.entity();
         let typed = terminal.clone();
+        let dragged = terminal.clone();
         let focus = self.focus.clone();
         let palette = self.palette;
         div()
@@ -564,11 +739,26 @@ impl Render for Terminal {
                 canvas(
                     move |bounds, window, cx| {
                         let cell = paint::cell_size(window);
-                        let frame = terminal.update(cx, |terminal, _| terminal.frame(bounds, cell));
-                        paint::prepare(&frame, bounds.origin, cell, focused, &palette, window)
+                        let (frame, thumb) = terminal.update(cx, |terminal, cx| {
+                            (terminal.frame(bounds, cell, cx), terminal.thumb())
+                        });
+                        paint::prepare(
+                            &frame,
+                            bounds.origin,
+                            cell,
+                            focused,
+                            &palette,
+                            thumb,
+                            window,
+                        )
                     },
                     move |bounds, painted, window, cx| {
                         window.handle_input(&focus, ElementInputHandler::new(bounds, typed), cx);
+                        window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
+                            if phase == DispatchPhase::Bubble && event.dragging() {
+                                dragged.update(cx, |terminal, cx| terminal.drag(event, cx));
+                            }
+                        });
                         painted.paint(window, cx);
                     },
                 )

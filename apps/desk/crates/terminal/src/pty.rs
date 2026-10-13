@@ -1,13 +1,17 @@
-use flume::r#async::RecvStream;
+use flume::Receiver;
 use portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 use std::env;
+use std::fs::{self, File, OpenOptions};
 use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use std::thread;
+use std::time::Instant;
 
 const READ_CHUNK: usize = 16 * 1024;
-const OUTPUT_BACKLOG: usize = 32;
 const TERM_PROGRAM: &str = "tofu-desk";
+const BYTES_LOG_VARIABLE: &str = "DESK_TERMINAL_BYTES";
+const DESK_FOLDER: &str = "tofu-desk";
+const BYTES_LOG_FILE: &str = "terminal-bytes.log";
 const POWERSHELLS: [&str; 2] = ["pwsh", "powershell"];
 
 pub(crate) enum Output {
@@ -73,13 +77,55 @@ fn command(shell: &Path, cwd: &Path) -> CommandBuilder {
     command
 }
 
+fn bytes_log() -> Option<File> {
+    env::var_os(BYTES_LOG_VARIABLE)?;
+    let home = |name: &str| {
+        env::var_os(name)
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+    };
+    let config = if cfg!(windows) {
+        home("APPDATA")
+    } else {
+        home("XDG_CONFIG_HOME").or_else(|| home("HOME").map(|home| home.join(".config")))
+    };
+    let Some(folder) = config.map(|config| config.join(DESK_FOLDER)) else {
+        eprintln!("terminal: {BYTES_LOG_VARIABLE} is set but there is no config folder");
+        return None;
+    };
+    let path = folder.join(BYTES_LOG_FILE);
+    let opened = fs::create_dir_all(&folder)
+        .and_then(|()| OpenOptions::new().create(true).append(true).open(&path));
+    match opened {
+        Ok(file) => {
+            eprintln!("terminal: pty bytes go to {}", path.display());
+            Some(file)
+        }
+        Err(error) => {
+            eprintln!("terminal: could not open {}: {error}", path.display());
+            None
+        }
+    }
+}
+
+fn log_bytes(log: &mut Option<File>, started: Instant, bytes: &[u8]) {
+    let Some(file) = log else {
+        return;
+    };
+    let at = started.elapsed().as_millis();
+    if let Err(error) = writeln!(file, "{at} {}", bytes.escape_ascii()) {
+        eprintln!("terminal: the pty byte log stopped: {error}");
+        *log = None;
+    }
+}
+
 impl Pty {
     pub(crate) fn spawn(
         shell: &Path,
         cwd: &Path,
         cols: u16,
         rows: u16,
-    ) -> Result<(Self, RecvStream<'static, Output>), String> {
+    ) -> Result<(Self, Receiver<Output>), String> {
         let pair = native_pty_system()
             .openpty(size(cols, rows))
             .map_err(|error| format!("could not open a pty: {error:#}"))?;
@@ -110,15 +156,18 @@ impl Pty {
                 }
             }
         });
-        let (output, received) = flume::bounded(OUTPUT_BACKLOG);
+        let (output, received) = flume::unbounded();
         let exits = output.clone();
+        let mut log = bytes_log();
         thread::spawn(move || {
+            let started = Instant::now();
             let mut chunk = vec![0; READ_CHUNK];
             loop {
                 match reader.read(&mut chunk) {
                     Ok(0) => return,
                     Ok(read) => {
                         let bytes = chunk.get(..read).unwrap_or_default().to_vec();
+                        log_bytes(&mut log, started, &bytes);
                         if output.send(Output::Bytes(bytes)).is_err() {
                             return;
                         }
@@ -139,7 +188,7 @@ impl Pty {
                 killer,
                 pid,
             },
-            received.into_stream(),
+            received,
         ))
     }
 

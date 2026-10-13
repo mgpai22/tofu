@@ -35,6 +35,7 @@ const ANSI: [ColorToken; 16] = [
 
 struct FrameLog {
     output_at: Option<Instant>,
+    seen: Option<Instant>,
     frames: Vec<Instant>,
     _output: Subscription,
 }
@@ -104,14 +105,19 @@ pub fn mount(project: &Path, cx: &mut App) -> Entity<TerminalModule> {
             "desk: terminal shell {}",
             terminal.read(cx).shell().display()
         );
-        log_pid(terminal.read(cx));
         let events = cx.subscribe(&terminal, TerminalModule::heard);
         let frame_log = env::var_os(FRAME_LOG).map(|_| FrameLog {
             output_at: None,
+            seen: None,
             frames: Vec::new(),
-            _output: cx.observe(&terminal, |module: &mut TerminalModule, _, cx| {
-                if let Some(log) = &mut module.frame_log {
-                    log.output_at = Some(Instant::now());
+            _output: cx.observe(&terminal, |module: &mut TerminalModule, terminal, cx| {
+                let output_at = terminal.read(cx).last_output();
+                if let Some(log) = &mut module.frame_log
+                    && output_at.is_some()
+                    && log.seen != output_at
+                {
+                    log.seen = output_at;
+                    log.output_at = output_at;
                     cx.notify();
                 }
             }),

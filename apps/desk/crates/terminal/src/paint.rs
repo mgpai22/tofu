@@ -9,12 +9,15 @@ use gpui::{
     Window, fill, font, outline, point, px, size,
 };
 use std::mem;
+use std::ops::RangeInclusive;
 
 const FONT_SIZE: f32 = 14.;
 const LINE_HEIGHT: f32 = 1.3;
 const FALLBACK_ADVANCE: f32 = 0.6;
 const BAR_WIDTH: f32 = 2.;
 const DECORATION: f32 = 1.;
+const BOX_DRAWING: RangeInclusive<char> = '\u{2500}'..='\u{259F}';
+const POWERLINE: RangeInclusive<char> = '\u{E0B0}'..='\u{E0D7}';
 const FAMILY: &str = if cfg!(target_os = "windows") {
     "Consolas"
 } else if cfg!(target_os = "macos") {
@@ -55,6 +58,7 @@ pub(crate) struct Painted {
     backgrounds: Vec<PaintQuad>,
     cursor: Option<PaintQuad>,
     lines: Vec<(Point<Pixels>, ShapedLine)>,
+    thumb: Option<PaintQuad>,
     line_height: Pixels,
 }
 
@@ -156,6 +160,10 @@ impl Layout {
     }
 
     fn glyph(&mut self, col: usize, ch: char, extra: Option<&[char]>, color: Hsla, flags: Flags) {
+        let alone = drawn_alone(ch);
+        if alone {
+            self.close_span();
+        }
         if self.text.is_empty() {
             self.start = col;
         }
@@ -213,19 +221,30 @@ impl Layout {
                 letter_spacing: None,
             }),
         }
-        if flags.contains(Flags::WIDE_CHAR) {
+        if alone || flags.contains(Flags::WIDE_CHAR) {
             self.close_span();
         }
     }
 }
 
-pub(crate) fn frame(content: RenderableContent<'_>, palette: &Palette, focused: bool) -> Frame {
+fn drawn_alone(ch: char) -> bool {
+    BOX_DRAWING.contains(&ch) || POWERLINE.contains(&ch)
+}
+
+pub(crate) fn frame(
+    content: RenderableContent<'_>,
+    palette: &Palette,
+    focused: bool,
+    cursor_lit: bool,
+) -> Frame {
     let offset = content.display_offset;
-    let cursor = point_to_viewport(offset, content.cursor.point).map(|at| Cursor {
-        row: at.line,
-        col: at.column.0,
-        shape: content.cursor.shape,
-    });
+    let cursor = point_to_viewport(offset, content.cursor.point)
+        .filter(|_| cursor_lit)
+        .map(|at| Cursor {
+            row: at.line,
+            col: at.column.0,
+            shape: content.cursor.shape,
+        });
     let solid = cursor.filter(|cursor| focused && cursor.shape == CursorShape::Block);
     let mut layout = Layout {
         mono: mono(),
@@ -285,12 +304,24 @@ pub(crate) fn prepare(
     cell: Size<Pixels>,
     focused: bool,
     palette: &Palette,
+    thumb: Option<PaintQuad>,
     window: &Window,
 ) -> Painted {
-    let at = |row: usize, col: usize| {
+    let scale = window.scale_factor();
+    let snap = |at: Point<Pixels>, round: fn(f32) -> f32| {
+        at.map(|value| px(round(f32::from(value) * scale) / scale))
+    };
+    let corner = |row: usize, col: usize| {
         point(
             origin.x + cell.width * col as f32,
             origin.y + cell.height * row as f32,
+        )
+    };
+    let at = |row: usize, col: usize| snap(corner(row, col), f32::floor);
+    let cells = |row: usize, col: usize, rows: usize, cols: usize| {
+        Bounds::from_corners(
+            at(row, col),
+            snap(corner(row + rows, col + cols), f32::ceil),
         )
     };
     let backgrounds = frame
@@ -298,13 +329,7 @@ pub(crate) fn prepare(
         .iter()
         .map(|block| {
             fill(
-                Bounds::new(
-                    at(block.row, block.col),
-                    size(
-                        cell.width * block.cols as f32,
-                        cell.height * block.rows as f32,
-                    ),
-                ),
+                cells(block.row, block.col, block.rows, block.cols),
                 block.color,
             )
         })
@@ -312,7 +337,7 @@ pub(crate) fn prepare(
     let cursor = frame.cursor.and_then(|cursor| {
         cursor_quad(
             cursor,
-            Bounds::new(at(cursor.row, cursor.col), cell),
+            cells(cursor.row, cursor.col, 1, 1),
             focused,
             palette.cursor,
         )
@@ -334,6 +359,7 @@ pub(crate) fn prepare(
         backgrounds,
         cursor,
         lines,
+        thumb,
         line_height: cell.height,
     }
 }
@@ -379,6 +405,9 @@ impl Painted {
             {
                 eprintln!("terminal could not paint a line: {error:#}");
             }
+        }
+        if let Some(thumb) = self.thumb {
+            window.paint_quad(thumb);
         }
     }
 }
