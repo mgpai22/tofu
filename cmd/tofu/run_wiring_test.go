@@ -574,7 +574,7 @@ func TestAModelWithNoRecordedWindowCompactsAtTheOperatingCeiling(t *testing.T) {
 		t.Fatalf("parseRunArgs: %v", err)
 	}
 	var decisions []llm.Decision
-	for i := range 10 {
+	for i := range konst.ContextCeilingTokens / 25000 {
 		name := "part-" + strconv.Itoa(i) + ".txt"
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(strings.Repeat(strings.Repeat("x", 99)+"\n", 200)), 0o600); err != nil {
 			t.Fatal(err)
