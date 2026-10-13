@@ -150,7 +150,7 @@ func (b *Boundary) Bash(command string, grammar Grammar) error {
 		return b.Shell(command)
 	}
 	if grammar == PowerShell {
-		if strings.Contains(command, "{") || strings.Contains(command, "<#") {
+		if strings.Contains(bracedVariable.ReplaceAllString(command, ""), "{") || strings.Contains(command, "<#") {
 			return ReadListError{Program: "this command", Why: "has a PowerShell script block or block comment, which this check cannot see into"}
 		}
 		command = strings.ReplaceAll(command, `\`, "/")
@@ -158,7 +158,7 @@ func (b *Boundary) Bash(command string, grammar Grammar) error {
 	commands := shellCommands(command, b.temp())
 	left := false
 	for _, step := range commands {
-		if err := step.treeWide(); err != nil {
+		if err := step.treeWide(b.Owns()); err != nil {
 			return err
 		}
 		if err := grammar.reads(step, left); err != nil {
@@ -166,7 +166,83 @@ func (b *Boundary) Bash(command string, grammar Grammar) error {
 		}
 		left = left || step.leaves()
 	}
-	return b.writes(commands, grammar.changes, grammar.devices())
+	if err := b.writes(commands, grammar.changes, grammar.devices()); err != nil {
+		return err
+	}
+	formatted, err := writesOf(commands, simpleCommand.formats, nil)
+	if err != nil {
+		return err
+	}
+	for _, written := range formatted {
+		if err := b.Write(written); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c simpleCommand) unwrapped() (string, []shellWord) {
+	tool, args := c.named()
+	for tool == "rtk" {
+		if first(args) == "proxy" {
+			args = args[1:]
+		}
+		if len(args) == 0 {
+			break
+		}
+		tool, args = toolName(args[0].text), args[1:]
+	}
+	return tool, args
+}
+
+func (c simpleCommand) formats() []shellWord {
+	tool, args := c.unwrapped()
+	emits := slices.ContainsFunc(args, func(arg shellWord) bool { return strings.HasPrefix(arg.text, "--emit") })
+	rewrites := tool == "gofmt" && given(args, "-w") || tool == "rustfmt" && !given(args, "--check") && !emits
+	if !rewrites {
+		return nil
+	}
+	var files []shellWord
+	for i := 0; i < len(args); i++ {
+		switch text := args[i].text; {
+		case slices.Contains([]string{"-r", "--edition", "--style-edition", "--config-path", "--config", "--color"}, text):
+			i++
+		case !strings.HasPrefix(text, "-"):
+			files = append(files, args[i])
+		}
+	}
+	return files
+}
+
+func (c simpleCommand) buildsInto() []shellWord {
+	tool, args := c.unwrapped()
+	var into []shellWord
+	for _, word := range c.words {
+		if !shellAssignment.MatchString(word.text) {
+			break
+		}
+		if dir, set := strings.CutPrefix(word.text, "CARGO_TARGET_DIR="); set {
+			into = append(into, shellWord{text: dir, expands: word.expands})
+		}
+	}
+	if strings.HasPrefix(first(args), "+") {
+		args = args[1:]
+	}
+	if tool != "cargo" || first(args) != "build" {
+		return into
+	}
+	for i, arg := range args {
+		if dir, set := strings.CutPrefix(arg.text, "--target-dir="); set {
+			return append(into, shellWord{text: dir, expands: arg.expands})
+		}
+		if arg.text == "--target-dir" && i+1 < len(args) {
+			return append(into, args[i+1])
+		}
+	}
+	if len(into) == 0 {
+		into = append(into, shellWord{text: "target"})
+	}
+	return into
 }
 
 func (g Grammar) devices() []string {
@@ -181,7 +257,7 @@ func (g Grammar) devices() []string {
 
 func (g Grammar) changes(c simpleCommand) []shellWord {
 	tool, args := c.named()
-	changed := append(c.targets(), c.relinks()...)
+	changed := append(append(c.targets(), c.relinks()...), c.buildsInto()...)
 	if tool == "touch" || tool == "mkdir" || g == PowerShell && tool == "cp" {
 		changed = append(changed, operands(args)...)
 	}
@@ -219,7 +295,7 @@ func (g Grammar) reads(c simpleCommand, left bool) error {
 	for len(words) > 0 && shellAssignment.MatchString(words[0].text) {
 		name, _, _ := strings.Cut(words[0].text, "=")
 		if !slices.Contains([]string{"CI", "NO_COLOR", "FORCE_COLOR", "TERM", "TZ", "LANG", "LC_ALL", "GOMAXPROCS", "GOOS", "GOARCH",
-			"CGO_ENABLED", "RUST_BACKTRACE", "RUST_LOG", "NODE_ENV", "PYTHONDONTWRITEBYTECODE", "PYTHONUNBUFFERED"}, name) {
+			"CGO_ENABLED", "CARGO_TARGET_DIR", "RUST_BACKTRACE", "RUST_LOG", "NODE_ENV", "PYTHONDONTWRITEBYTECODE", "PYTHONUNBUFFERED"}, name) {
 			return ReadListError{Program: name, Why: "is set before the command, and a variable can change what a program runs"}
 		}
 		words = words[1:]
@@ -298,8 +374,15 @@ func (g Grammar) readOnly(tool string, args []shellWord) (bool, error) {
 		return true, g.gitReads(args)
 	case "go":
 		return true, goChecks(args)
+	case "gofmt":
+		return false, g.refuses(tool, args, "-cpuprofile")
+	case "rustfmt":
+		return false, nil
 	case "rtk":
-		if first(args) == "proxy" {
+		switch first(args) {
+		case "read", "smart", "tree":
+			return false, nil
+		case "proxy":
 			args = args[1:]
 		}
 		return g.wrapped(tool, args)
@@ -328,8 +411,8 @@ func (g Grammar) readOnly(tool string, args []shellWord) (bool, error) {
 		if strings.HasPrefix(first(args), "+") {
 			args = args[1:]
 		}
-		if !slices.Contains([]string{"test", "check", "clippy", "tree", "metadata"}, first(args)) && (first(args) != "fmt" || !given(args, "--check")) {
-			return true, ReadListError{Program: tool, Why: "runs here only as cargo test, check, clippy, tree, metadata or fmt --check"}
+		if !slices.Contains([]string{"test", "check", "clippy", "build", "tree", "metadata"}, first(args)) && (first(args) != "fmt" || !given(args, "--check")) {
+			return true, ReadListError{Program: tool, Why: "runs here only as cargo test, check, clippy, build into a target folder you hold, tree, metadata or fmt --check"}
 		}
 		return true, g.refuses(tool, args, runnerWrites()...)
 	case "npm", "pnpm", "yarn", "bun":

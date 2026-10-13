@@ -15,7 +15,10 @@ folder, or a glob such as `internal/turn/*.go`. The lead gives it in the
 - A `bash` command is read before it runs, step by step. Outside `owns` it
   runs only when every step reads: reading, listing, searching, inspecting,
   `git` reads, and the project's own checks such as `go test`, `cargo
-  test` or `npm test`. `rm`, `mv`, a redirect, `sed -i`, `bash -c`,
+  test` or `npm test`, and the formatters `gofmt` and `rustfmt`. A
+  formatter that rewrites files, `cargo build`, and a `CARGO_TARGET_DIR`
+  run only when the files or the target folder are in `owns` or the scratch
+  folder. `rm`, `mv`, a redirect, `sed -i`, `bash -c`,
   PowerShell's `Set-Content` and anything the check can't read are refused
   with the reason. A write into the agent's own scratch folder is
   allowed, and `TMP`, `TEMP` and `TMPDIR` point there; the system's
@@ -23,8 +26,11 @@ folder, or a glob such as `internal/turn/*.go`. The lead gives it in the
   The same check runs on Git Bash, PowerShell, Linux and macOS.
 - A source file, such as `.go` or `.ts`, changes only through `edit` or
   `write`, never the shell.
-- Commands over the whole tree, such as `go test ./...`, are refused; they
-  are the lead's to run once, after the sub-agents finish.
+- A command over the whole tree, such as `go test ./...` or `gofmt -l .`,
+  is judged by the folders it reaches. When the agent holds a file in every
+  folder it reaches, as in a one-package project, it runs. Otherwise it is
+  refused, and it is the lead's to run once, after the sub-agents finish.
+  `go test all` is always refused.
 
 ## Inline code asks you
 

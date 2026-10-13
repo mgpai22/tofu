@@ -45,10 +45,15 @@ func (e DeniedError) Error() string {
 	return fmt.Sprintf("%q is outside the paths this agent holds (%s): name it in your report, which asks the orchestrator to grant it, and do not edit it another way", e.Path, strings.Join(e.Owns, ", "))
 }
 
+var msysDrive = regexp.MustCompile(`^/[A-Za-z](/|$)`)
+
 var globCharset = regexp.MustCompile(`^[A-Za-z0-9_./*$@+()-]+$`)
 
 func normalizePath(path string) string {
 	slashed := strings.ReplaceAll(path, `\`, "/")
+	if runtime.GOOS == "windows" && msysDrive.MatchString(slashed) {
+		slashed = slashed[1:2] + ":" + slashed[2:]
+	}
 	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
 		return strings.ToLower(slashed)
 	}

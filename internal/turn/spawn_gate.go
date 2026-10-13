@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -47,10 +48,19 @@ func gateMissed(project string, recipes map[string]string, definition subagent.D
 			said = ""
 		}
 		for _, call := range sinceEdit {
+			if !gateRan(check, call, recipes) || call.Error == typecheckUnanswered {
+				continue
+			}
+			printed := printedBy(rounds, call.Call)
+			chained := strings.ContainsAny(call.Command, ";|&\n")
+			verdict := goCheckPrinted(check, printed, call.ExitCode)
 			switch {
-			case !gateRan(check, call, recipes), call.Error == typecheckUnanswered:
-			case checkerMissing(printedBy(rounds, call.Call)):
+			case checkerMissing(printed):
 				said = check + " could not run: its checker is not installed"
+			case chained && verdict == printedFailed:
+				said = check + " failed"
+			case chained && verdict == printedPassed:
+				said = ""
 			case call.ExitCode != nil && *call.ExitCode != 0:
 				said = fmt.Sprintf("%s exited %d", check, *call.ExitCode)
 			case call.Tool == "typecheck" && call.Error != "" && !typecheckNamesOwnFile(project, owns, call, rounds):
@@ -66,6 +76,31 @@ func gateMissed(project string, recipes map[string]string, definition subagent.D
 		}
 	}
 	return missed
+}
+
+type printedVerdict int
+
+const (
+	printedNothing printedVerdict = iota
+	printedPassed
+	printedFailed
+)
+
+var (
+	goDiagnostic = regexp.MustCompile(`(?m)^\S+\.go:\d+:\d+: `)
+	goTestFailed = regexp.MustCompile(`(?m)^(FAIL\b|--- FAIL|panic: |\s*\[FAIL\]|Go test: .*\bfailed\b)`)
+	goTestPassed = regexp.MustCompile(`(?m)^(ok\s+\S|\?\s+\S+\s+\[no test files\]|Go test: \d+ passed in )`)
+)
+
+func goCheckPrinted(check, printed string, exit *int) printedVerdict {
+	tested := goTestFailed.MatchString(printed) || goTestPassed.MatchString(printed)
+	switch {
+	case check == "go test" && goTestFailed.MatchString(printed), check == "go vet" && goDiagnostic.MatchString(printed):
+		return printedFailed
+	case check == "go test" && tested, check == "go vet" && (tested || exit != nil && *exit == 0):
+		return printedPassed
+	}
+	return printedNothing
 }
 
 func printedBy(rounds []Row, call string) string {

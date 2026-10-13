@@ -1,7 +1,9 @@
 package subagent
 
 import (
+	"os"
 	"path"
+	"slices"
 	"strings"
 )
 
@@ -51,4 +53,34 @@ func walksWithoutAPath(tool string, rest []string) bool {
 func treeWideRefusal(tool, field string) string {
 	named := strings.TrimSpace(tool + " " + strings.ReplaceAll(field, "/", " "))
 	return named + " is a tree-wide command: the orchestrator runs it, not a sub-agent"
+}
+
+func reachesOnlyHeldFolders(tool string, owns []string) bool {
+	if slices.Contains(owns, "**") {
+		return true
+	}
+	goFiles, anyHeld := tool == "go" || recursesOnCurrentDirectory[tool] || walksTheModuleWithNoPath[tool], false
+	for queue := []string{"."}; len(queue) > 0; queue = queue[1:] {
+		entries, err := os.ReadDir(queue[0])
+		if err != nil {
+			return false
+		}
+		reached, holds := false, false
+		for _, entry := range entries {
+			name, named := entry.Name(), path.Join(queue[0], entry.Name())
+			switch {
+			case entry.IsDir() && !strings.HasPrefix(name, ".") && !strings.HasPrefix(name, "_") && !slices.Contains([]string{"testdata", "vendor", "node_modules"}, name):
+				queue = append(queue, named)
+			case entry.IsDir(), goFiles && path.Ext(name) != ".go":
+			default:
+				mine, _ := Matches(named, owns)
+				reached, holds = true, holds || mine
+			}
+		}
+		if reached && !holds {
+			return false
+		}
+		anyHeld = anyHeld || holds
+	}
+	return anyHeld
 }

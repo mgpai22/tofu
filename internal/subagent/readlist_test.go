@@ -249,12 +249,14 @@ func TestBashHoldsWritesInsidePartOfTheTreeToTodaysRules(t *testing.T) {
 		{"mv a.txt src/a.txt", notOwned},
 		{`python -c "open('src/a.txt','w').write('x')"`, notRead},
 		{"cargo fmt", notRead},
-		{"gofmt -w src/x.go", notRead},
+		{"gofmt -w src/x.go", ""},
+		{"gofmt -w README.go", notOwned},
 	})
 	drive(t, NewBoundary("files", "", []string{"**"}), POSIX, []bashRow{
 		{`python -c "open('a.txt','w').write('x')"`, ""},
 		{"rm README.md", ""},
-		{"go test ./...", treeWide},
+		{"go test ./...", ""},
+		{"go test all", treeWide},
 	})
 }
 

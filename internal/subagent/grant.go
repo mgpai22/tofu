@@ -68,3 +68,11 @@ func (b *Boundary) Asked() []Question {
 	defer b.mu.Unlock()
 	return slices.Clone(b.asked)
 }
+
+func (b *Boundary) Reported() []Question {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	reported := b.asked
+	b.asked = nil
+	return reported
+}

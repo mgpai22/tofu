@@ -52,6 +52,49 @@ func TestAGateCheckerThatIsNotInstalledIsNotAPass(t *testing.T) {
 	}
 }
 
+func TestEachGoCheckInAChainedCommandIsJudgedByWhatItPrinted(t *testing.T) {
+	const (
+		failed  = "--- FAIL: TestFails (0.00s)\n    x_test.go:8: got 1\nFAIL\nFAIL\texample.com/x\t0.459s\nFAIL"
+		passed  = "ok  \texample.com/shop\t0.518s"
+		vetDiag = "x.go:5:41: fmt.Sprintf format %d has arg \"a\" of wrong type string"
+		rtkFail = "Go test: 1 passed, 1 failed in 1 packages\n\nx (1 passed, 1 failed)\n  [FAIL] TestFails\n     x_test.go:8: got 1"
+		rtkPass = "Go test: 11 passed in 1 packages"
+		grepHit = "./cart.go:12:func (c Cart) CalcTotal() Money {"
+	)
+	for _, c := range []struct {
+		command, printed string
+		exit             int
+		want             string
+	}{
+		{"go vet ./...; go test ./...", failed, 0, "go test failed"},
+		{"go vet ./... ; go test ./... ; echo done", failed, 0, "go test failed"},
+		{"gofmt -l . ; go vet . && go test . ; grep -rn CalcTotal . --include=*.go", passed, 1, ""},
+		{"gofmt -l .; go vet ./... && go test ./... 2>&1; grep -rn CalcTotal .", passed, 1, ""},
+		{"go test ./... 2>&1 | tail -5", failed, 0, "go vet did not run; go test failed"},
+		{"go vet ./...; go test ./...", vetDiag + "\n" + passed, 0, "go vet failed"},
+		{"go vet ./... ; go test ./... ; grep -rn CalcTotal .", rtkPass + "\n" + grepHit, 0, ""},
+		{"go vet . ; go test . | tail -3", rtkFail, 0, "go test failed"},
+		{"go vet ./...; go test ./...", "FAIL\texample.com/shop [build failed]", 1, "go test failed"},
+		{"go vet ./...; go test ./...", "", 1, "go vet exited 1; go test exited 1"},
+		{"make lint && go vet ./... && go test ./...", "", 2, "go vet exited 2; go test exited 2"},
+		{"go vet ./... && go test ./...", "", 0, ""},
+		{"go test ./...", passed, 1, "go vet did not run; go test exited 1"},
+		{"go vet ./...", "", 1, "go vet exited 1; go test did not run"},
+	} {
+		exit := c.exit
+		rows := []Row{{
+			Steps: []StepRow{{ToolCalls: []ToolCallRow{
+				{Tool: "edit", Args: json.RawMessage(`{"path":"cart.go"}`)},
+				{Call: "check", Tool: "bash", Command: c.command, ExitCode: &exit},
+			}}},
+			Conversation: []llm.Message{{Role: llm.RoleTool, ToolCallID: "check", Content: c.printed}},
+		}}
+		if missed := strings.Join(gateMissed("", nil, goDev, nil, rows), "; "); missed != c.want {
+			t.Errorf("%q exit %d printing %q: the gate said %q, want %q", c.command, c.exit, c.printed, missed, c.want)
+		}
+	}
+}
+
 func typecheckRound(content string) []Row {
 	call := ToolCallRow{Call: "tc", Tool: "typecheck", Command: "web/src", Args: json.RawMessage(`{"path":"web/src"}`), Error: "typecheck: tsc, errors in src: 1, in other files: 0"}
 	return []Row{{

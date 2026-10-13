@@ -189,7 +189,12 @@ func (l *shellLexer) word() shellWord {
 	return shellWord{text: text.String(), expands: expands, runs: runs}
 }
 
-var shellName = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+const shellNamePattern = `[A-Za-z0-9_]+(\[([0-9]+|@|\*)\])?`
+
+var (
+	shellName      = regexp.MustCompile(`^` + shellNamePattern + `$`)
+	bracedVariable = regexp.MustCompile(`\$\{` + shellNamePattern + `\}`)
+)
 
 func substitutes(expansion string) bool {
 	if inner, braced := strings.CutPrefix(expansion, "${"); braced {
@@ -381,16 +386,16 @@ func ShellSteps(command string) []ShellStep {
 	return steps
 }
 
-func (c simpleCommand) treeWide() error {
+func (c simpleCommand) treeWide(owns []string) error {
 	tool, args := c.named()
 	var rest []string
 	for _, arg := range args {
-		if namesTheWholeTree(tool, arg.text) {
+		if namesTheWholeTree(tool, arg.text) && (cleanedField(arg.text) == "all" || !reachesOnlyHeldFolders(tool, owns)) {
 			return errors.New(treeWideRefusal(tool, arg.text))
 		}
 		rest = append(rest, arg.text)
 	}
-	if walksWithoutAPath(tool, rest) {
+	if walksWithoutAPath(tool, rest) && !reachesOnlyHeldFolders(tool, owns) {
 		return errors.New(treeWideRefusal(tool, "(no path given)"))
 	}
 	return nil
@@ -469,7 +474,7 @@ func ShellWrites(command string) ([]string, error) {
 func (b *Boundary) Shell(command string) error {
 	commands := shellCommands(command, b.temp())
 	for _, command := range commands {
-		if err := command.treeWide(); err != nil {
+		if err := command.treeWide(b.Owns()); err != nil {
 			return err
 		}
 	}
