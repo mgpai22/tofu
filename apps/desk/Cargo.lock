@@ -1462,6 +1462,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "desk_control"
+version = "0.1.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "desk_core"
 version = "0.1.0"
 dependencies = [
