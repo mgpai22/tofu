@@ -8,6 +8,7 @@ key right
 key right
 key right
 key right
+key right
 wait Browser model
 key down
 key down

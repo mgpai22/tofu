@@ -2,15 +2,15 @@
 title: Settings and reload
 description: Two settings files, the project over yours, read again at every task, searchable in the app.
 order: 8
-updated: 2026-10-09
+updated: 2026-10-12
 ---
 
 A setting is a named switch with a default, like `gatePrompt` or
 `subAgentsPerTurn`. You write only the ones you change, in
 `~/.tofu/settings.json` for every project or `.tofu/settings.json` for one.
-The project wins over yours, and yours over the default. 53 settings sit in
-seven groups: Appearance, Interaction, Context, Files, Shell, Turn and
-Browser.
+The project wins over yours, and yours over the default. 57 settings sit in
+eight groups: Appearance, Interaction, Context, Files, Shell, Turn, Projects
+and Browser. Projects holds boardy, the ticket board, and the scratchpad.
 
 ![Ctrl+K search over the settings, with browser typed](./media/tui-search.png)
 
@@ -70,12 +70,13 @@ Turn
     subAgentCache           1h                               default
     subAgentCheckSeconds    1800                             default
     subAgentWatchSeconds    600                              default
-    scratchCleanupDays      7                                default
-    scratchMaxGB            50                               default
-    projectManagement       off                              default
-    boardFlow               jira                             default
     verifySubAgents         true                             default
     agentSources            tofu,agents,claude               default
+Projects
+    projectManagement       off                              default
+    boardFlow               jira                             default
+    scratchCleanupDays      7                                default
+    scratchMaxGB            50                               default
 ```
 
 `oneTurnPerProject` keeps one orchestrator per project: while one

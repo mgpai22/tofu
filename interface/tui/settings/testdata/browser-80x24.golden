@@ -8,15 +8,15 @@
     Context       14      Browser driver                        subagent  ▾     
     Files         03      subagent gives the browser steps to a browser sub…    
     Shell         05                                                            
-    Turn          19      Browser steps                               30  ▾     
-  › Browser       06      how many actions one browser task may take            
-                                                                                
-  NAVIGATE                Browser model                          default  ▾     
-  ↑↓ setting · ←→         the subscription model a browser task asks for th…    
-  section                                                                       
-  ctrl+k search ·         Browser effort                         default  ▾     
-  esc chat                the effort the browser sub-agent runs at, when it…    
-                                                                                
+    Turn          15      Browser steps                               30  ▾     
+    Projects      04      how many actions one browser task may take            
+  › Browser       06                                                            
+                          Browser model                          default  ▾     
+  NAVIGATE                the subscription model a browser task asks for th…    
+  ↑↓ setting · ←→                                                               
+  section                 Browser effort                         default  ▾     
+  ctrl+k search ·         the effort the browser sub-agent runs at, when it…    
+  esc chat                                                                      
                           Browser cursor                                ● on    
                           a small cursor labelled tofu glides to each click…    
                                                                                 

@@ -9,15 +9,15 @@
   › Context       14      summarized asks Claude for a summary of its thinking; omitted asks fo…    
     Files         03                                                                                
     Shell         05      Images                                                        auto  ▾     
-    Turn          19      auto sends a pasted image only to a model that can see, inline always…    
-    Browser       06                                                                                
-                          Project instructions                                         32768  ▾     
-  NAVIGATE                bytes of your instruction files sent each turn                            
-  ↑↓ setting · ←→                                                                                   
-  section               › Instruction files                                     claude-first  ▾     
-  ctrl+k search ·         a folder with both AGENTS.md and CLAUDE.md sends one: agents-first se…    
-  esc chat                                                                                          
-                          Skills                                                            ● on    
+    Turn          15      auto sends a pasted image only to a model that can see, inline always…    
+    Projects      04                                                                                
+    Browser       06      Project instructions                                         32768  ▾     
+                          bytes of your instruction files sent each turn                            
+  NAVIGATE                                                                                          
+  ↑↓ setting · ←→       › Instruction files                                     claude-first  ▾     
+  section                 a folder with both AGENTS.md and CLAUDE.md sends one: agents-first se…    
+  ctrl+k search ·                                                                                   
+  esc chat                Skills                                                            ● on    
                           on lists the skills in .tofu, .agents and .claude skill folders to th…    
                                                                                                     
                           Memory                                                            ● on    
@@ -39,15 +39,15 @@
   › Context       14     a folder with both AGENTS.md and CLAUDE.md sends    g; omitted asks fo…    
     Files         03     one: agents-first sends AGENTS.md, claude-first                            
     Shell         05     sends CLAUDE.md, both sends both and costs more                auto  ▾     
-    Turn          19     tokens. Read from the working directory up to its   see, inline always…    
-    Browser       06     git root; the home directory gives only                                    
-                         ~/.tofu/AGENTS.md                                             32768  ▾     
-  NAVIGATE                                                                                          
-  ↑↓ setting · ←→          agents-first                                                             
-  section                                                                       claude-first  ▾     
-  ctrl+k search ·        >  claude-first                                     e: agents-first se…    
-  esc chat                                                                                          
-                           both                                                             ● on    
+    Turn          15     tokens. Read from the working directory up to its   see, inline always…    
+    Projects      04     git root; the home directory gives only                                    
+    Browser       06     ~/.tofu/AGENTS.md                                             32768  ▾     
+                                                                                                    
+  NAVIGATE                 agents-first                                                             
+  ↑↓ setting · ←→                                                               claude-first  ▾     
+  section                >  claude-first                                     e: agents-first se…    
+  ctrl+k search ·                                                                                   
+  esc chat                 both                                                             ● on    
                                                                              kill folders to th…    
                          1-3/3 · ↑↓ preview · enter apply · esc cancel                              
                                                                                             ● on    
@@ -69,15 +69,15 @@
   › Context       14     a folder with both AGENTS.md and CLAUDE.md sends    g; omitted asks fo…    
     Files         03     one: agents-first sends AGENTS.md, claude-first                            
     Shell         05     sends CLAUDE.md, both sends both and costs more                auto  ▾     
-    Turn          19     tokens. Read from the working directory up to its   see, inline always…    
-    Browser       06     git root; the home directory gives only                                    
-                         ~/.tofu/AGENTS.md                                             32768  ▾     
-  NAVIGATE                                                                                          
-  ↑↓ setting · ←→          agents-first                                                             
-  section                                                                               both  ▾     
-  ctrl+k search ·          claude-first                                      e: agents-first se…    
-  esc chat                                                                                          
-                         >  both                                                            ● on    
+    Turn          15     tokens. Read from the working directory up to its   see, inline always…    
+    Projects      04     git root; the home directory gives only                                    
+    Browser       06     ~/.tofu/AGENTS.md                                             32768  ▾     
+                                                                                                    
+  NAVIGATE                 agents-first                                                             
+  ↑↓ setting · ←→                                                                       both  ▾     
+  section                  claude-first                                      e: agents-first se…    
+  ctrl+k search ·                                                                                   
+  esc chat               >  both                                                            ● on    
                                                                              kill folders to th…    
                          1-3/3 · ↑↓ preview · enter apply · esc cancel                              
                                                                                             ● on    

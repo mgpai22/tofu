@@ -9,15 +9,15 @@
     Context       14     >  tofu                                                                    
     Files         03                                                                                
     Shell         05       tofu light                                                 subtle  ▾     
-    Turn          19                                                                                
-    Browser       06       tofu dusk                                                                
-                                                                                     compact  ▾     
-  NAVIGATE                 Solarized Light                                                          
-  ↑↓ setting · ←→                                                                                   
-  section                  Dracula                                                      auto  ▾     
-  ctrl+k search ·                                                                                   
-  esc chat                 Nord                                                                     
-                                                                                                    
+    Turn          15                                                                                
+    Projects      04       tofu dusk                                                                
+    Browser       06                                                                 compact  ▾     
+                           Solarized Light                                                          
+  NAVIGATE                                                                                          
+  ↑↓ setting · ←→          Dracula                                                      auto  ▾     
+  section                                                                                           
+  ctrl+k search ·          Nord                                                                     
+  esc chat                                                                                          
                            Gruvbox                                                                  
                                                                                                     
                            terminal                                                                 

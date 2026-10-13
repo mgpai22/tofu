@@ -9,15 +9,15 @@
     Context       14      a turn may spawn a sub-agent                                              
     Files         03                                                                                
     Shell         05      One turn per project                                              ● on    
-  › Turn          19      while one session runs a turn in this project, a turn from any other …    
-    Browser       06                                                                                
-                          Side chat access                                              read  ▾     
-  NAVIGATE                what a new side chat may write: read writes nothing, notes writes .md…    
-  ↑↓ setting · ←→                                                                                   
-  section                 Sub-agents running at once                                      10  ▾     
-  ctrl+k search ·         how many sub-agents may run at once; a spawn past it is refused until…    
-  esc chat                                                                                          
-                          Sub-agent depth                                                  2  ▾     
+  › Turn          15      while one session runs a turn in this project, a turn from any other …    
+    Projects      04                                                                                
+    Browser       06      Side chat access                                              read  ▾     
+                          what a new side chat may write: read writes nothing, notes writes .md…    
+  NAVIGATE                                                                                          
+  ↑↓ setting · ←→         Sub-agents running at once                                      10  ▾     
+  section                 how many sub-agents may run at once; a spawn past it is refused until…    
+  ctrl+k search ·                                                                                   
+  esc chat                Sub-agent depth                                                  2  ▾     
                           how deep a sub-agent may spawn its own sub-agents; the next spawn rea…    
                                                                                                     
                           Sub-agent cache                                                 1h  ▾     

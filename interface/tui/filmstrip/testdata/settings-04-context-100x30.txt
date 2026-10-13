@@ -9,15 +9,15 @@
   › Context       14      full keeps every sub-agents event, summary the latest 200, off shows …    
     Files         03                                                                                
     Shell         05      Thinking                                                          ● on    
-    Turn          19      thinking shows in each agent's sub-agents feed; t there toggles it        
-    Browser       06                                                                                
-                          Thinking summary                                        summarized  ▾     
-  NAVIGATE                summarized asks Claude for a summary of its thinking; omitted asks fo…    
-  ↑↓ setting · ←→                                                                                   
-  section                 Images                                                        auto  ▾     
-  ctrl+k search ·         auto sends a pasted image only to a model that can see, inline always…    
-  esc chat                                                                                          
-                          Project instructions                                         32768  ▾     
+    Turn          15      thinking shows in each agent's sub-agents feed; t there toggles it        
+    Projects      04                                                                                
+    Browser       06      Thinking summary                                        summarized  ▾     
+                          summarized asks Claude for a summary of its thinking; omitted asks fo…    
+  NAVIGATE                                                                                          
+  ↑↓ setting · ←→         Images                                                        auto  ▾     
+  section                 auto sends a pasted image only to a model that can see, inline always…    
+  ctrl+k search ·                                                                                   
+  esc chat                Project instructions                                         32768  ▾     
                           bytes of your instruction files sent each turn                            
                                                                                                     
                           Instruction files                                     agents-first  ▾     

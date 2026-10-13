@@ -9,15 +9,15 @@
     Context       14      Change shortcuts handled inside tofu                                      
     Files         03                                                                                
     Shell         05      Host integration                                       inspect Zed  ▾     
-    Turn          19      Detect host shortcut conflicts and available integrations                 
-    Browser       06                                                                                
-                          Confirmations                                                 auto  ▾     
-  NAVIGATE                auto lets jev decide at every gate and work never stops for you: only…    
-  ↑↓ setting · ←→                                                                                   
-  section                 Question wait                                                  120  ▾     
-  ctrl+k search ·         under auto, a question the lead asks you takes its recommended option…    
-  esc chat                                                                                          
-                          Read before edit                                                  ● on    
+    Turn          15      Detect host shortcut conflicts and available integrations                 
+    Projects      04                                                                                
+    Browser       06      Confirmations                                                 auto  ▾     
+                          auto lets jev decide at every gate and work never stops for you: only…    
+  NAVIGATE                                                                                          
+  ↑↓ setting · ←→         Question wait                                                  120  ▾     
+  section                 under auto, a question the lead asks you takes its recommended option…    
+  ctrl+k search ·                                                                                   
+  esc chat                Read before edit                                                  ● on    
                           an edit or a write to a file this session has not read, or that chang…    
                                                                                                     
                           Auto update                                                       ● on    

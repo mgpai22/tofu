@@ -9,15 +9,15 @@
     Context       14      OSC 8 terminal file links; off prints the bare path                       
   › Files         03                                                                                
     Shell         05      Group by agent                                                    ● on    
-    Turn          19      Author filters in edit feeds                                              
-    Browser       06                                                                                
-                        enter change  ·  shift+tab scope  ·  esc chat                               
+    Turn          15      Author filters in edit feeds                                              
+    Projects      04                                                                                
+    Browser       06    enter change  ·  shift+tab scope  ·  esc chat                               
+                                                                                                    
   NAVIGATE                                                                                          
   ↑↓ setting · ←→                                                                                   
   section                                                                                           
   ctrl+k search ·                                                                                   
   esc chat                                                                                          
-                                                                                                    
                                                                                                     
                                                                                                     
                                                                                                     

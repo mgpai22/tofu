@@ -9,7 +9,8 @@
     Context       14      the typed model that judges the model's calls, shell results, browser…    
     Files         03                                                                                
     Shell         05    enter change  ·  shift+tab scope  ·  esc chat                               
-    Turn          19                                                                                
+    Turn          15                                                                                
+    Projects      04                                                                                
     Browser       06                                                                                
                                                                                                     
   NAVIGATE                                                                                          
@@ -17,7 +18,6 @@
   section                                                                                           
   ctrl+k search ·                                                                                   
   esc chat                                                                                          
-                                                                                                    
                                                                                                     
                                                                                                     
                                                                                                     
@@ -99,7 +99,8 @@
     Context       14      the typed model that judges the model's calls, shell results, browser…    
     Files         03                                                                                
     Shell         05    enter change  ·  shift+tab scope  ·  esc chat                               
-    Turn          19                                                                                
+    Turn          15                                                                                
+    Projects      04                                                                                
     Browser       06                                                                                
                                                                                                     
   NAVIGATE                                                                                          
@@ -107,7 +108,6 @@
   section                                                                                           
   ctrl+k search ·                                                                                   
   esc chat                                                                                          
-                                                                                                    
                                                                                                     
                                                                                                     
                                                                                                     

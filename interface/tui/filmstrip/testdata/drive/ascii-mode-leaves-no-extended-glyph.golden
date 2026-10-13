@@ -189,15 +189,15 @@
     Context       14      Spacing across lists and panels                                           
     Files         03                                                                                
     Shell         05      Animations                                                  subtle  v     
-    Turn          19      Motion for conversational states                                          
-    Browser       06                                                                                
-                          Status bar                                                 compact  v     
-  NAVIGATE                Context, quotas, and runtime counters                                     
-  ^v setting . <>                                                                                   
-  section                 Color mode                                                    auto  v     
-  ctrl+k search .         Terminal color capability                                                 
-  esc chat                                                                                          
-                        LIVE PREVIEW                                                                
+    Turn          15      Motion for conversational states                                          
+    Projects      04                                                                                
+    Browser       06      Status bar                                                 compact  v     
+                          Context, quotas, and runtime counters                                     
+  NAVIGATE                                                                                          
+  ^v setting . <>         Color mode                                                    auto  v     
+  section                 Terminal color capability                                                 
+  ctrl+k search .                                                                                   
+  esc chat              LIVE PREVIEW                                                                
                                                                                                     
                            tofu    project  .  develop                                              
                           Interface preview                                                         
@@ -219,15 +219,15 @@
     Context       14     >  tofu                                                                    
     Files         03                                                                                
     Shell         05       tofu light                                                 subtle  v     
-    Turn          19                                                                                
-    Browser       06       tofu dusk                                                                
-                                                                                     compact  v     
-  NAVIGATE                 Solarized Light                                                          
-  ^v setting . <>                                                                                   
-  section                  Dracula                                                      auto  v     
-  ctrl+k search .                                                                                   
-  esc chat                 Nord                                                                     
-                                                                                                    
+    Turn          15                                                                                
+    Projects      04       tofu dusk                                                                
+    Browser       06                                                                 compact  v     
+                           Solarized Light                                                          
+  NAVIGATE                                                                                          
+  ^v setting . <>          Dracula                                                      auto  v     
+  section                                                                                           
+  ctrl+k search .          Nord                                                                     
+  esc chat                                                                                          
                            Gruvbox                                                                  
                                                                                                     
                            terminal                                                                 

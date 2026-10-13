@@ -8,15 +8,15 @@
     Context         14      Densi                                                        CURRENT VALUE                  
     Files           03      Spaci  Theme                                          esc     Solarized Light               
     Shell           05             tofu uses Zed Nu Disco; choose a palette                                             
-    Turn            19      Anima                                                        HOW IT WORKS                   
-    Browser         06      Motio    tofu                                                Enter opens a focused          
-                                                                                         choice. Changes preview        
-  NAVIGATE                  Statu    tofu light                                          immediately; Esc keeps the     
-  ↑↓ setting · ←→           Conte                                                        prior value.                   
-  section                            tofu dusk                                                                          
-  ctrl+k search · esc       Color                                                        SCOPE                          
-  chat                      Termi  >  Solarized Light                                    Global · a project value       
-                                                                                         overrides it                   
+    Turn            15      Anima                                                        HOW IT WORKS                   
+    Projects        04      Motio    tofu                                                Enter opens a focused          
+    Browser         06                                                                   choice. Changes preview        
+                            Statu    tofu light                                          immediately; Esc keeps the     
+  NAVIGATE                  Conte                                                        prior value.                   
+  ↑↓ setting · ←→                    tofu dusk                                                                          
+  section                   Color                                                        SCOPE                          
+  ctrl+k search · esc       Termi  >  Solarized Light                                    Global · a project value       
+  chat                                                                                   overrides it                   
                           LIVE PR    Dracula                                             …tester/.tofu/settings.json    
                                                                                                                         
                              tofu    Nord                                                                               

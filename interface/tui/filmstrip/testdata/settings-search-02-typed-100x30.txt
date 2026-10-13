@@ -10,14 +10,14 @@
     Files         Type to filter · ↑↓ select · enter jump                                           
     Shell                                                                             subtle  ▾     
     Turn          › diff█                                                                           
-    Browser                                                                                         
-                  › Files / Diff context                                             compact  ▾     
-  NAVIGATE                                                                                          
-  ↑↓ setting · ←  1 of 1 results                                                                    
-  section                                                                               auto  ▾     
+    Projects                                                                                        
+    Browser       › Files / Diff context                                             compact  ▾     
+                                                                                                    
+  NAVIGATE        1 of 1 results                                                                    
+  ↑↓ setting · ←                                                                        auto  ▾     
+  section                                                                                           
   ctrl+k search                                                                                     
   esc chat                                                                                          
-                                                                                                    
                                                                                                     
                                                                                                     
                           Interface preview                                                         
