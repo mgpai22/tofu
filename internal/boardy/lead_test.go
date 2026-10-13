@@ -69,10 +69,12 @@ func TestALeadSessionActsForThePersonAndItsSubAgentDoesNot(t *testing.T) {
 
 func TestLintRefusesTwoWildcardGlobsInOneFolder(t *testing.T) {
 	m, first := sessionBoard(t)
-	if _, err := m.Store.Edit(first.ID, func(ticket *Ticket) error { ticket.Owns = []string{"x/*.go"}; return nil }); err != nil {
+	if _, err := m.Store.Edit(first.ID, func(ticket *Ticket) error { ticket.Owns, ticket.Status = []string{"x/*.go"}, Doing; return nil }); err != nil {
 		t.Fatal(err)
 	}
-	second, err := m.Local.Create("DEMO", ticketWith("the tests", "x/*_test.go"), "test")
+	tests := ticketWith("the tests", "x/*_test.go")
+	tests.Status = Doing
+	second, err := m.Local.Create("DEMO", tests, "test")
 	if err != nil {
 		t.Fatal(err)
 	}

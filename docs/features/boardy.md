@@ -20,8 +20,11 @@ under a lock that works on Linux, macOS and Windows, so twenty `tofu boardy
 new` started at once get twenty different numbers.
 
 **Ownership is checked, not hoped for.** A ticket names the paths it owns.
-`tofu boardy lint` refuses two live tickets whose owns overlap and names
+`tofu boardy lint` refuses two doing tickets whose owns overlap and names
 both, globs included: `x/*.go` and `x/*_test.go` both hold `x/a_test.go`.
+A ticket holds its owns only while it is doing; review, todo and done
+tickets keep theirs as a record. An owns entry may be an absolute path in
+another repository, such as `F:/work/other-repo/**`.
 
 **Your words.** Set `boardFlow` to `jira` (ticket, board, epic, sprint,
 points) or `linear` (issue, team, project, cycle, estimate). The files are

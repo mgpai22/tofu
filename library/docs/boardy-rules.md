@@ -26,13 +26,13 @@ Every move checks, in order:
 
 - The actor's role allows it.
 - A move to doing, review or done has an Acceptance; review has a Log.
-- A create, a widen, or a move to doing has owns disjoint from every live ticket on every board of the project; the refusal names the ticket.
+- A create, a widen, or a move to doing has owns disjoint from every doing ticket on every board of the project; the refusal names the ticket. Tickets in other statuses keep their owns as a record and are not checked.
 - The ticket's depends, blocks, relates and duplicates resolve.
 - The board's rules for the event pass.
 
 ## Where it lives
 
-- `boards/<KEY>/board.toml`: the managers, one per line of its list.
+- `boards/<KEY>/board.toml`: the managers, one per line of its list, and `holds`, the statuses whose owns are held (`["doing"]` when absent).
 - `boards/<KEY>/triage/T<n>.json`: one waiting request each.
 - `boards/<KEY>/rules/`: the board's rule files.
 - `boards/<KEY>/events.jsonl`: one line per create, move, accept, hand and wait.

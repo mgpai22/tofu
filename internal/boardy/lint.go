@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"tofu/internal/subagent"
 )
@@ -21,7 +22,7 @@ type Finding struct {
 func (s Store) Lint(boards []Board) []Finding {
 	var findings []Finding
 	tickets := map[string]Ticket{}
-	var live []Ticket
+	var holding []Ticket
 	for _, board := range boards {
 		paths, err := s.TicketFiles(board.Key)
 		if err != nil {
@@ -36,8 +37,8 @@ func (s Store) Lint(boards []Board) []Finding {
 			}
 			tickets[ticket.ID] = ticket
 			highest = max(highest, ticketNumber(path))
-			if ticket.Status.Live() {
-				live = append(live, ticket)
+			if board.Holding(ticket.Status) {
+				holding = append(holding, ticket)
 			}
 		}
 		raw, _ := os.ReadFile(filepath.Join(board.Dir, counterFileName))
@@ -48,10 +49,10 @@ func (s Store) Lint(boards []Board) []Finding {
 	for _, ticket := range tickets {
 		findings = append(findings, s.lintTicket(ticket, tickets)...)
 	}
-	for i, a := range live {
-		for _, b := range live[i+1:] {
+	for i, a := range holding {
+		for _, b := range holding[i+1:] {
 			if glob, other, found := ownsMeet(a.Owns, b.Owns); found {
-				findings = append(findings, Finding{Ticket: a.ID, File: s.path(a.ID), What: fmt.Sprintf("%s and %s are both live and their owns overlap: %q and %q", a.ID, b.ID, glob, other)})
+				findings = append(findings, Finding{Ticket: a.ID, File: s.path(a.ID), What: fmt.Sprintf("%s and %s both hold their owns (%s, %s) and they overlap: %q and %q", a.ID, b.ID, a.Status, b.Status, glob, other)})
 			}
 		}
 	}
@@ -84,17 +85,23 @@ func (s Store) lintTicket(ticket Ticket, tickets map[string]Ticket) []Finding {
 		}
 	}
 	for _, glob := range ticket.Owns {
-		if _, err := subagent.Matches(literalPrefix(glob), []string{glob}); err != nil {
+		if err := unreadableOwns(glob); err != nil {
 			say("%s owns %q: %v", ticket.ID, glob, err)
 		}
 	}
 	return findings
 }
 
+func unreadableOwns(glob string) error {
+	held := heldGlob(glob)
+	_, err := subagent.Matches(literalPrefix(held), []string{held})
+	return err
+}
+
 func ownsMeet(left, right []string) (string, string, bool) {
 	for _, a := range left {
 		for _, b := range right {
-			if subagent.Overlap(a, b) {
+			if subagent.Overlap(heldGlob(a), heldGlob(b)) {
 				return a, b, true
 			}
 		}
@@ -102,8 +109,17 @@ func ownsMeet(left, right []string) (string, string, bool) {
 	return "", "", false
 }
 
+func heldGlob(glob string) string {
+	slashed := strings.ReplaceAll(glob, `\`, "/")
+	drive, rest, found := strings.Cut(slashed, ":")
+	if !found || len(drive) != 1 || !unicode.IsLetter(rune(drive[0])) || rest != "" && rest[0] != '/' {
+		return slashed
+	}
+	return "/" + strings.ToLower(drive) + rest
+}
+
 func literalPrefix(glob string) string {
-	segments := strings.Split(strings.ReplaceAll(glob, `\`, "/"), "/")
+	segments := strings.Split(glob, "/")
 	for i, segment := range segments {
 		if strings.ContainsAny(segment, "*?[") {
 			return cmp.Or(strings.Join(segments[:i], "/"), ".")

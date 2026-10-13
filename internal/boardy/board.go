@@ -29,9 +29,12 @@ type Board struct {
 	Key      string    `json:"key"`
 	Name     string    `json:"name"`
 	Managers []string  `json:"managers,omitempty"`
+	Holds    []Status  `json:"holds"`
 	Created  time.Time `json:"created"`
 	Dir      string    `json:"dir"`
 }
+
+func (b Board) Holding(status Status) bool { return slices.Contains(b.Holds, status) }
 
 type Store struct {
 	Dir string
@@ -55,7 +58,7 @@ func (s Store) Init(key, name string) (Board, error) {
 	if !boardKey.MatchString(key) {
 		return Board{}, fmt.Errorf("%q is not a board key: two to ten capital letters or digits, starting with a letter", key)
 	}
-	board := Board{Key: key, Name: name, Created: time.Now().UTC().Truncate(time.Second), Dir: s.BoardDir(key)}
+	board := Board{Key: key, Name: name, Holds: []Status{Doing}, Created: time.Now().UTC().Truncate(time.Second), Dir: s.BoardDir(key)}
 	err := s.locked(key, "board", func() error {
 		if found, err := sys.Exists(filepath.Join(board.Dir, BoardFileName)); found || err != nil {
 			return errors.Join(err, fmt.Errorf("the board %s already exists at %s", key, board.Dir))
@@ -111,14 +114,14 @@ func (s Store) SaveBoard(board Board) error {
 
 func (b Board) toml() []byte {
 	quote := func(value any) string { raw, _ := json.Marshal(value); return string(raw) }
-	return fmt.Appendf(nil, "key = %s\nname = %s\nmanagers = %s\ncreated = %s\n",
-		quote(b.Key), quote(b.Name), quote(append([]string{}, b.Managers...)), quote(b.Created.UTC().Format(time.RFC3339)))
+	return fmt.Appendf(nil, "key = %s\nname = %s\nmanagers = %s\nholds = %s\ncreated = %s\n",
+		quote(b.Key), quote(b.Name), quote(append([]string{}, b.Managers...)), quote(b.Holds), quote(b.Created.UTC().Format(time.RFC3339)))
 }
 
 func parseBoard(raw []byte) (Board, error) {
 	var board Board
 	var created string
-	fields := map[string]any{"key": &board.Key, "name": &board.Name, "managers": &board.Managers, "created": &created}
+	fields := map[string]any{"key": &board.Key, "name": &board.Name, "managers": &board.Managers, "holds": &board.Holds, "created": &created}
 	for line := range strings.Lines(string(raw)) {
 		if line = strings.TrimSpace(line); line == "" || strings.HasPrefix(line, "#") {
 			continue
@@ -131,6 +134,14 @@ func parseBoard(raw []byte) (Board, error) {
 		}
 		if err := json.Unmarshal([]byte(strings.TrimSpace(value)), into); err != nil {
 			return board, fmt.Errorf("%s %s: %w", BoardFileName, key, err)
+		}
+	}
+	if len(board.Holds) == 0 {
+		board.Holds = []Status{Doing}
+	}
+	for _, status := range board.Holds {
+		if _, err := ParseStatus(string(status)); err != nil {
+			return board, fmt.Errorf("%s holds: %w", BoardFileName, err)
 		}
 	}
 	var err error

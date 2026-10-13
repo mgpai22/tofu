@@ -112,7 +112,9 @@ func TestTransitionTriage(t *testing.T) {
 
 func TestTransitionWidenAndReferences(t *testing.T) {
 	m := managedBoard(t, "DEMO", "OPS")
-	live, err := m.Create("OPS", ticketWith("live", "internal/rule/**"), manager)
+	doing := ticketWith("doing", "internal/rule/**")
+	doing.Status = Doing
+	live, err := m.Create("OPS", doing, manager)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +125,9 @@ func TestTransitionWidenAndReferences(t *testing.T) {
 	if _, err := m.Move(closed.ID, Done, "", manager); err != nil {
 		t.Fatal(err)
 	}
-	mine, err := m.Create("DEMO", ticketWith("mine", "docs/**"), manager)
+	ours := ticketWith("mine", "docs/**")
+	ours.Status = Doing
+	mine, err := m.Create("DEMO", ours, manager)
 	if err != nil {
 		t.Fatal(err)
 	}

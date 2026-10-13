@@ -21,8 +21,9 @@ review, with its evidence in the Log, and appends to its own Log. It never
 changes owns and never closes.
 
 **Owns are checked on every change.** A create, a widen or a move to doing
-is refused when its owns overlap a live ticket's owns on any board of the
-project, and the refusal names that ticket.
+is refused when its owns overlap a doing ticket's owns on any board of the
+project, and the refusal names that ticket. Only doing holds owns, unless
+`holds` in `board.toml` names more statuses.
 
 **The person is asked only when a rule says so.** Without a rule, a manager
 closes a ticket. With one, the close waits for the person.

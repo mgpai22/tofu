@@ -30,7 +30,7 @@ and estimate. Only the words change. The setting `projectManagement` is
 ## Where it lives
 
     ~/.tofu/projects/<project>/boards/<KEY>/
-      board.toml          key, name, managers, created
+      board.toml          key, name, managers, holds, created
       counter             the last number handed out
       tickets/<KEY>-<n>.md
       epics/ milestones/ sprints/
@@ -84,8 +84,15 @@ reaches a prompt.
 `--status review` shows one status. `lint` reads every ticket on every
 board and exits 1 on a front matter error, a reference to a ticket no board
 holds, a blocked ticket with no reason, a counter behind its tickets, or two
-live tickets whose owns overlap, naming both: `x/*.go` and `x/*_test.go`
+doing tickets whose owns overlap, naming both: `x/*.go` and `x/*_test.go`
 overlap, because both hold `x/a_test.go`.
+
+A ticket holds its owns only while it is doing, where an agent writes.
+Every other ticket keeps its owns as a record, so two review tickets may
+own the same paths. `holds = ["doing", "review"]` in `board.toml` makes
+more statuses hold. An owns entry may be an absolute path outside the
+project, such as `F:/work/other-repo/**` or `/home/me/other-repo/**`; it
+is checked the same way, case-folded on Windows and macOS.
 
 ## Undo it
 

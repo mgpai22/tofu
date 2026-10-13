@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"tofu/internal/rule"
-	"tofu/internal/subagent"
 )
 
 func (m Managed) Create(key string, ticket Ticket, actor string) (Ticket, error) {
@@ -28,7 +27,7 @@ func (m Managed) create(key string, ticket Ticket, actor, replaces string) (Tick
 	if err := m.referencesResolve(ticket); err != nil {
 		return Ticket{}, err
 	}
-	if err := m.ownsFree(ticket.ID, ticket.Owns, replaces); err != nil {
+	if err := m.ownsFree(key, ticket.ID, ticket.Owns, cmp.Or(ticket.Status, Backlog), replaces); err != nil {
 		return Ticket{}, err
 	}
 	preview, err := os.CreateTemp(m.Store.BoardDir(key), ".tofu-create-*.md")
@@ -54,7 +53,7 @@ func (m Managed) Move(id string, to Status, reason, actor string) (Ticket, error
 	if err := m.mayMove(m.role(board, actor), ticket, to, actor); err != nil {
 		return ticket, err
 	}
-	if err := m.validMove(ticket, to); err != nil {
+	if err := m.validMove(board, ticket, to); err != nil {
 		return ticket, err
 	}
 	event := rule.EventMove
@@ -90,7 +89,7 @@ func (m Managed) Widen(id string, owns []string, actor string) (Ticket, error) {
 	if len(added) == 0 {
 		return ticket, fmt.Errorf("%s already owns %s", id, strings.Join(owns, ", "))
 	}
-	if err := m.ownsFree(id, added, ""); err != nil {
+	if err := m.ownsFree(board.Key, id, added, ticket.Status, ""); err != nil {
 		return ticket, err
 	}
 	if err := m.gate(board.Key, m.boardEvent(rule.EventWiden, ticket, ticket.Status, actor)); err != nil {
@@ -141,17 +140,21 @@ func (m Managed) mayMove(role Role, ticket Ticket, to Status, actor string) erro
 	panic("boardy: unknown role " + string(role))
 }
 
-func (m Managed) validMove(ticket Ticket, to Status) error {
+func (m Managed) validMove(board Board, ticket Ticket, to Status) error {
 	if slices.Contains([]Status{Doing, Review, Done}, to) && !slices.ContainsFunc(ticket.Acceptance, func(lines string) bool { return strings.TrimSpace(lines) != "" }) {
 		return RefusedError{Ticket: ticket.ID, Why: fmt.Sprintf("it has no Acceptance, and a ticket reaches %s only with one", to)}
 	}
 	if to == Review && strings.TrimSpace(ticket.Log) == "" {
 		return RefusedError{Ticket: ticket.ID, Why: "its Log has no evidence, and a ticket reaches review with its evidence in the Log"}
 	}
+	var err error
 	if to == Doing || (!ticket.Status.Live() && to.Live()) {
-		return errors.Join(m.referencesResolve(ticket), m.ownsFree(ticket.ID, ticket.Owns, ""))
+		err = m.referencesResolve(ticket)
 	}
-	return nil
+	if !board.Holding(ticket.Status) {
+		err = errors.Join(err, m.ownsFree(board.Key, ticket.ID, ticket.Owns, to, ""))
+	}
+	return err
 }
 
 func (m Managed) referencesResolve(ticket Ticket) error {
@@ -163,13 +166,18 @@ func (m Managed) referencesResolve(ticket Ticket) error {
 	return nil
 }
 
-func (m Managed) ownsFree(id string, owns []string, replaces string) error {
-	if len(owns) == 0 {
-		return nil
+func (m Managed) ownsFree(key, id string, owns []string, status Status, replaces string) error {
+	for _, glob := range owns {
+		if err := unreadableOwns(glob); err != nil {
+			return RefusedError{Ticket: id, Why: err.Error()}
+		}
 	}
 	boards, err := m.Store.Boards()
 	if err != nil {
 		return err
+	}
+	if len(owns) == 0 || !slices.ContainsFunc(boards, func(b Board) bool { return b.Key == key && b.Holding(status) }) {
+		return nil
 	}
 	for _, board := range boards {
 		tickets, err := m.Store.Tickets(board.Key)
@@ -177,16 +185,11 @@ func (m Managed) ownsFree(id string, owns []string, replaces string) error {
 			return err
 		}
 		for _, held := range tickets {
-			if held.ID == id || held.ID == replaces || !held.Status.Live() || len(held.Owns) == 0 {
+			if held.ID == id || held.ID == replaces || !board.Holding(held.Status) {
 				continue
 			}
-			var roster subagent.Roster
-			var collision subagent.CollisionError
-			if err := roster.Hold(subagent.SubAgent{ID: held.ID, Owns: held.Owns}); err != nil {
-				return err
-			}
-			if errors.As(roster.Hold(subagent.SubAgent{ID: id, Owns: owns}), &collision) {
-				return RefusedError{Ticket: id, Why: fmt.Sprintf("%s overlaps %s, owned by %s (%s)", collision.Glob, collision.HolderGlob, held.ID, held.Status)}
+			if glob, other, found := ownsMeet(owns, held.Owns); found {
+				return RefusedError{Ticket: id, Why: fmt.Sprintf("%s overlaps %s, held by %s (%s)", glob, other, held.ID, held.Status)}
 			}
 		}
 	}
