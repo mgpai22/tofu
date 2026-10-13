@@ -88,6 +88,7 @@ Every verb that reports state takes --json and prints one JSON document.
 `
 
 func main() {
+	stopProfile := sys.StartProfile()
 	opensTheApp := len(os.Args) < 2 || os.Args[1] == "--continue"
 	if opensTheApp || os.Args[1] == "migrate" {
 		copyLegacyStateDirs(os.Stderr)
@@ -103,6 +104,7 @@ func main() {
 	pages := sys.ReadConsolePages()
 	code := run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
 	pages.Restore()
+	stopProfile()
 	os.Exit(code)
 }
 

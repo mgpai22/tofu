@@ -21,7 +21,10 @@ type Choice struct {
 	Path  string
 	Label string
 	Note  string
+	bash  string
 }
+
+func (c Choice) program() string { return cmp.Or(c.bash, c.Path) }
 
 const powerShellUTF8Output = "try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}\n"
 
@@ -31,7 +34,7 @@ func (c Choice) Command(ctx context.Context, dir, command string, extraEnv ...st
 	case "pwsh", "powershell":
 		args = []string{"-NoProfile", "-NonInteractive", "-Command", powerShellUTF8Output + command}
 	}
-	cmd := exec.CommandContext(ctx, c.Path, args...)
+	cmd := exec.CommandContext(ctx, c.program(), args...)
 	cmd.Dir = dir
 	cmd.Env = slices.DeleteFunc(os.Environ(), func(entry string) bool {
 		name, _, _ := strings.Cut(entry, "=")
@@ -44,6 +47,9 @@ func (c Choice) Command(ctx context.Context, dir, command string, extraEnv ...st
 	}
 	cmd.Env = append(cmd.Env, "GIT_EDITOR=true", "GIT_SEQUENCE_EDITOR=true")
 	cmd.Env = append(cmd.Env, extraEnv...)
+	if c.bash != "" {
+		cmd.Env = gitLauncherEnv(cmd.Env, c.Path)
+	}
 	return cmd
 }
 
@@ -90,11 +96,52 @@ func exists(path string) bool {
 	return err == nil
 }
 
-func family(path string) (string, error) {
+func (c Choice) family() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), konst.ShellProbeTimeoutMillis*time.Millisecond)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, path, "-c", "uname -o").Output()
+	cmd := exec.CommandContext(ctx, c.program(), "-c", "uname -o")
+	if c.bash != "" {
+		cmd.Env = gitLauncherEnv(os.Environ(), c.Path)
+	}
+	out, err := cmd.Output()
 	return strings.TrimSpace(string(out)), err
+}
+
+func gitBashChoice(launcher string) Choice {
+	top := filepath.Dir(filepath.Dir(launcher))
+	bash := filepath.Join(top, "usr", "bin", "bash.exe")
+	if !strings.EqualFold(filepath.Base(filepath.Dir(launcher)), "bin") || !exists(bash) || !exists(filepath.Join(top, "mingw64", "bin")) {
+		return Choice{Path: launcher}
+	}
+	return Choice{Path: launcher, bash: bash}
+}
+
+func gitLauncherEnv(env []string, launcher string) []string {
+	lookup := func(name string) string {
+		found := ""
+		for _, entry := range env {
+			if key, value, _ := strings.Cut(entry, "="); strings.EqualFold(key, name) {
+				found = value
+			}
+		}
+		return found
+	}
+	home := lookup("HOME")
+	if home == "" {
+		home = lookup("USERPROFILE")
+		if drive := lookup("HOMEDRIVE") + lookup("HOMEPATH"); lookup("HOMEPATH") != "" {
+			if info, err := os.Stat(drive); err == nil && info.IsDir() {
+				home = drive
+			}
+		}
+		env = append(env, "HOME="+home)
+	}
+	if lookup("PLINK_PROTOCOL") == "" {
+		env = append(env, "PLINK_PROTOCOL=ssh")
+	}
+	top := filepath.Dir(filepath.Dir(launcher))
+	path := strings.Join([]string{filepath.Join(top, "mingw64", "bin"), filepath.Join(top, "usr", "bin"), filepath.Join(home, "bin"), lookup("PATH")}, string(os.PathListSeparator))
+	return append(env, "MSYSTEM=MINGW64", "EXEPATH="+filepath.Dir(launcher), "PATH="+path)
 }
 
 func isWSL(family string) bool { return strings.Contains(family, "GNU/Linux") }
@@ -111,7 +158,7 @@ func resolveOverride(setting, source string) (Choice, error) {
 	if _, err := os.Stat(path); err != nil {
 		return Choice{}, fmt.Errorf("bash: %s is set to %q and it does not exist: %w", source, path, err)
 	}
-	named, err := family(path)
+	named, err := Choice{Path: path}.family()
 	if err != nil {
 		return Choice{}, fmt.Errorf("bash: %s is set to %q and it would not run: %w", source, path, err)
 	}
@@ -153,8 +200,10 @@ func resolveWindows() (Choice, error) {
 		if !exists(bash) {
 			continue
 		}
-		if named, err := family(bash); err == nil {
-			return Choice{Path: bash, Label: "git bash on " + named}, nil
+		choice := gitBashChoice(bash)
+		if named, err := choice.family(); err == nil {
+			choice.Label = "git bash on " + named
+			return choice, nil
 		}
 		rejected = append(rejected, bash+" (found but would not run)")
 	}
@@ -162,7 +211,7 @@ func resolveWindows() (Choice, error) {
 		rejected = append(rejected, "git bash (not beside git on PATH, nor under Program Files, LOCALAPPDATA, GIT_INSTALL_ROOT or scoop)")
 	}
 	if path, err := exec.LookPath("bash"); err == nil {
-		named, probeErr := family(path)
+		named, probeErr := Choice{Path: path}.family()
 		if probeErr == nil && !isWSL(named) && !looksLikeWSLPath(path) {
 			return Choice{Path: path, Label: "bash on " + named}, nil
 		}
@@ -183,7 +232,7 @@ func resolveWindows() (Choice, error) {
 func resolvePosix() (Choice, error) {
 	for _, path := range []string{os.Getenv("SHELL"), "/bin/sh"} {
 		if path != "" && exists(path) {
-			named, _ := family(path)
+			named, _ := Choice{Path: path}.family()
 			return Choice{Path: path, Label: filepath.Base(path) + " on " + cmp.Or(named, runtime.GOOS)}, nil
 		}
 	}

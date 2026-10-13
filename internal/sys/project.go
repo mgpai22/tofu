@@ -140,20 +140,84 @@ func readProjectRegistry(home string) (projectRegistry, error) {
 	return registry, nil
 }
 
+func registeredFolder(home, path string) (string, error) {
+	name := filepath.Join(home, ProjectRegistryName)
+	file, err := os.Open(name)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
+	if err == nil {
+		defer func() { _ = file.Close() }()
+		var found string
+		if found, err = folderHolding(json.NewDecoder(file), path); err == nil {
+			return found, nil
+		}
+	}
+	return "", fmt.Errorf("the project registry %s: %w", name, err)
+}
+
+func folderHolding(decoder *json.Decoder, path string) (string, error) {
+	open, err := decoder.Token()
+	if err != nil || open == nil {
+		return "", err
+	}
+	if open != json.Delim('{') {
+		return "", fmt.Errorf("it holds %v where an object belongs", open)
+	}
+	var entry struct {
+		Folder string   `json:"folder"`
+		Paths  []string `json:"paths"`
+	}
+	found := ""
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			return "", err
+		}
+		if key != "projects" {
+			if err := decoder.Decode(&json.RawMessage{}); err != nil {
+				return "", err
+			}
+			continue
+		}
+		if list, err := decoder.Token(); err != nil || list != json.Delim('[') {
+			return "", err
+		}
+		for decoder.More() {
+			entry.Folder, entry.Paths = "", entry.Paths[:0]
+			if err := decoder.Decode(&entry); err != nil {
+				return "", err
+			}
+			if found == "" && slices.ContainsFunc(entry.Paths, func(p string) bool { return samePath(p, path) }) {
+				found = entry.Folder
+			}
+		}
+		if _, err := decoder.Token(); err != nil {
+			return "", err
+		}
+	}
+	_, err = decoder.Token()
+	return found, err
+}
+
 func locateProject(home, dir string) (Project, projectRegistry, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return Project{}, projectRegistry{}, err
 	}
+	project := Project{Path: resolvedPath(abs), home: home}
+	projects := filepath.Join(home, ProjectsDirName)
+	folder, err := registeredFolder(home, project.Path)
+	if err != nil {
+		return Project{}, projectRegistry{}, err
+	}
+	if folder != "" {
+		project.State, project.Registered = filepath.Join(projects, folder), true
+		return project, projectRegistry{}, nil
+	}
 	registry, err := readProjectRegistry(home)
 	if err != nil {
 		return Project{}, registry, err
-	}
-	project := Project{Path: resolvedPath(abs), home: home}
-	projects := filepath.Join(home, ProjectsDirName)
-	if entry := registry.holding(project.Path); entry != nil {
-		project.State, project.Registered = filepath.Join(projects, entry.Folder), true
-		return project, registry, nil
 	}
 	key := projectKey(project.Path)
 	for attempt := 1; registry.folder(key) != nil; attempt++ {

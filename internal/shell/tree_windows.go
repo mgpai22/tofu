@@ -78,26 +78,16 @@ func spawnSuspended(cmd *exec.Cmd) error {
 }
 
 func resumeSuspended(pid int) error {
-	snapshot, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPTHREAD, 0)
+	process, err := windows.OpenProcess(windows.PROCESS_SUSPEND_RESUME, false, uint32(pid))
 	if err != nil {
 		return err
 	}
-	defer func() { _ = windows.CloseHandle(snapshot) }()
-	var entry windows.ThreadEntry32
-	entry.Size = uint32(unsafe.Sizeof(entry))
-	for err := windows.Thread32First(snapshot, &entry); err == nil; err = windows.Thread32Next(snapshot, &entry) {
-		if entry.OwnerProcessID != uint32(pid) {
-			continue
-		}
-		thread, err := windows.OpenThread(windows.THREAD_SUSPEND_RESUME, false, entry.ThreadID)
-		if err != nil {
-			return err
-		}
-		_, err = windows.ResumeThread(thread)
-		_ = windows.CloseHandle(thread)
-		return err
+	defer func() { _ = windows.CloseHandle(process) }()
+	status, _, _ := windows.NewLazySystemDLL("ntdll.dll").NewProc("NtResumeProcess").Call(uintptr(process))
+	if status != 0 {
+		return windows.NTStatus(status)
 	}
-	return errors.New("shell: the suspended shell had no thread to resume")
+	return nil
 }
 
 func startTree(cmd *exec.Cmd, lifetime Lifetime) (tree, error) {

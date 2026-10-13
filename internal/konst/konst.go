@@ -221,7 +221,7 @@ const (
 
 	SubAgentWallClockSeconds = 3600
 
-	OrchestratorSourceLinesPerTurn = 10
+	OrchestratorSourceLinesPerTurn = 200
 )
 
 const (

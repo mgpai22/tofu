@@ -287,6 +287,7 @@ func worthKeeping(line string) bool {
 
 type KeyRedactor struct {
 	secrets  []string
+	names    []string
 	assigned *regexp.Regexp
 }
 
@@ -303,18 +304,23 @@ func LoadKeyRedactor() KeyRedactor {
 	}
 	secrets = slices.DeleteFunc(secrets, func(secret string) bool { return len(secret) < shortestRedactedKey })
 	slices.SortFunc(secrets, func(a, b string) int { return cmp.Compare(len(b), len(a)) })
+	quoted := make([]string, len(names))
 	for i, name := range names {
-		names[i] = regexp.QuoteMeta(name)
+		quoted[i] = regexp.QuoteMeta(name)
 	}
 	return KeyRedactor{
 		secrets:  secrets,
-		assigned: regexp.MustCompile(`\b(` + strings.Join(names, "|") + `)(\s*=\s*\\?["']?)[^\s"'\\\[][^\s"'\\]*`),
+		names:    names,
+		assigned: regexp.MustCompile(`\b(` + strings.Join(quoted, "|") + `)(\s*=\s*\\?["']?)[^\s"'\\\[][^\s"'\\]*`),
 	}
 }
 
 func (r KeyRedactor) Redact(text string) string {
 	for _, secret := range r.secrets {
 		text = strings.ReplaceAll(text, secret, KeyRedactedMark)
+	}
+	if !slices.ContainsFunc(r.names, func(name string) bool { return strings.Contains(text, name) }) {
+		return text
 	}
 	return r.assigned.ReplaceAllString(text, "${1}${2}"+KeyRedactedMark)
 }

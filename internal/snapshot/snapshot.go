@@ -23,6 +23,8 @@ const (
 	pinRefs               = "refs/undo/"
 	pruneLockName         = "prune.lock"
 	pruneLockLifetime     = time.Hour
+	pruneEvery            = time.Hour
+	prunedStampName       = "pruned"
 	gitDirName            = "undo.git"
 	ledgerName            = "undo-turns.jsonl"
 	indexName             = "undo.index"
@@ -58,6 +60,9 @@ func (r Repo) Prune(ctx context.Context) error {
 	}
 	_ = held.Close()
 	defer func() { _ = os.Remove(lock) }()
+	if info, err := os.Stat(r.prunedStamp()); err == nil && time.Since(info.ModTime()) < pruneEvery {
+		return nil
+	}
 	sessions := filepath.Dir(r.Session)
 	dirs, err := os.ReadDir(sessions)
 	if err != nil {
@@ -86,8 +91,8 @@ func (r Repo) Prune(ctx context.Context) error {
 		for _, one := range entries {
 			trees = append(trees, one.Start, one.End)
 		}
-		if indexed, err := live.git(ctx, "", "write-tree"); err == nil {
-			trees = append(trees, strings.TrimSpace(string(indexed)))
+		if indexed, err := live.writeTree(ctx); err == nil {
+			trees = append(trees, indexed)
 		}
 		for i, tree := range trees {
 			if tree != "" {
@@ -101,8 +106,18 @@ func (r Repo) Prune(ctx context.Context) error {
 	if _, err := r.git(ctx, pins.String(), "update-ref", "--stdin"); err != nil {
 		return err
 	}
-	_, err = r.git(ctx, "", "prune", "--expire="+pruneGrace)
-	return err
+	if _, err := r.git(ctx, "", "prune", "--expire="+pruneGrace); err != nil {
+		return err
+	}
+	return r.stampPruned()
+}
+
+func (r Repo) prunedStamp() string {
+	return filepath.Join(r.gitDir(), "objects", "info", prunedStampName)
+}
+
+func (r Repo) stampPruned() error {
+	return os.WriteFile(r.prunedStamp(), []byte(time.Now().UTC().Format(time.RFC3339Nano)), 0o644)
 }
 
 type Ask struct {
@@ -290,6 +305,9 @@ func (r Repo) track(ctx context.Context) (string, error) {
 		if err := os.WriteFile(filepath.Join(r.gitDir(), "info", "attributes"), []byte(verbatimAttributes), 0o644); err != nil {
 			return "", err
 		}
+		if err := r.stampPruned(); err != nil {
+			return "", err
+		}
 	}
 	if err := r.exclude(nil); err != nil {
 		return "", err
@@ -310,8 +328,7 @@ func (r Repo) track(ctx context.Context) (string, error) {
 	if _, err := r.git(ctx, "", "add", "--all"); err != nil {
 		return "", err
 	}
-	tree, err := r.git(ctx, "", "write-tree")
-	return strings.TrimSpace(string(tree)), err
+	return r.writeTree(ctx)
 }
 
 func (r Repo) exclude(large []string) error {
