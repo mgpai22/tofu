@@ -164,31 +164,45 @@ func (c boardyCall) check() int {
 	if err != nil {
 		return c.o.usage(err)
 	}
-	ticket, err := c.store.Get(c.args[1])
-	if err != nil {
-		return c.o.fail(err)
-	}
-	path, _ := c.store.TicketPath(ticket.ID)
-	fired, err := c.store.Check(ticket.Board(), rule.BoardEvent{Event: event, Ticket: ticket.ID, Path: path, From: string(ticket.Status),
-		To: cmp.Or(c.flags["to"], string(ticket.Status)), Actor: c.actor, ByPerson: c.managed.Person != "" && c.actor == c.managed.Person})
-	if err != nil {
-		return c.o.fail(err)
-	}
-	blocked := 0
-	for _, f := range fired {
-		if f.Blocked {
-			blocked++
+	var to boardy.Status
+	if raw := c.flags["to"]; raw != "" {
+		if to, err = boardy.ParseStatus(raw); err != nil {
+			return c.o.usage(err)
 		}
 	}
-	return c.o.done(blocked == 0, fired, func(page cli.Page) []string {
-		lines := page.Title("check "+string(event)+" "+ticket.ID, []string{ticket.Board()}, firesVerdict(len(fired), blocked))
+	id := c.args[1]
+	fired, err := c.managed.Check(event, id, to, c.actor)
+	var refused boardy.RefusedError
+	var waiting boardy.WaitingError
+	if err != nil && !errors.As(err, &refused) && !errors.As(err, &waiting) {
+		return c.o.fail(err)
+	}
+	answer := boardyChecked{Event: event, Ticket: id, Fired: append([]boardy.Fired{}, fired...)}
+	if err != nil {
+		answer.Refused = err.Error()
+	}
+	return c.o.done(err == nil, answer, func(page cli.Page) []string {
+		blocked := 0
+		rows := make([]cli.Row, 0, len(fired)+1)
 		for _, f := range fired {
 			mark := cli.Warn
 			if f.Blocked {
-				mark = cli.Fail
+				mark, blocked = cli.Fail, blocked+1
 			}
-			lines = append(lines, page.Rows([]cli.Row{{Mark: mark, Cells: []string{f.RuleID, string(f.Mode)}, Detail: f.Text()}})...)
+			rows = append(rows, cli.Row{Mark: mark, Cells: []string{f.RuleID, string(f.Mode)}, Detail: f.Text()})
 		}
-		return lines
+		verdict := firesVerdict(len(fired), blocked)
+		if err != nil {
+			verdict = cli.Verdict{Mark: cli.Fail, Text: "refused"}
+			rows = append(rows, cli.Row{Mark: cli.Fail, Cells: []string{answer.Refused}})
+		}
+		return append(page.Title("check "+string(event)+" "+id, nil, verdict), page.Rows(rows)...)
 	})
+}
+
+type boardyChecked struct {
+	Event   rule.Event     `json:"event"`
+	Ticket  string         `json:"ticket"`
+	Fired   []boardy.Fired `json:"fired"`
+	Refused string         `json:"refused,omitempty"`
 }

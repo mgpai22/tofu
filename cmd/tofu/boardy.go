@@ -2,10 +2,13 @@ package main
 
 import (
 	"cmp"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -15,16 +18,18 @@ import (
 	"tofu/internal/boardy"
 )
 
-const boardyUsage = "tofu boardy init|new|list|show|move|log|lint|boards|manager|triage|assign|hand|widen|check|view|report|epic|sprint [--json]"
+const boardyUsage = "tofu boardy init|new|list|show|move|log|lint|boards|held|manager|triage|assign|hand|widen|check|view|report|epic|sprint [--json]"
 
 func boardyUsageOf(subcommand string) string {
 	switch subcommand {
 	case "init":
 		return "tofu boardy init --key KEY [--name text] [--json]"
 	case "new":
-		return "tofu boardy new [--board KEY] [--type story|task|bug|subtask] [--priority P0..P4] [--status s] [--points n] [--owns a,b] [--acceptance text] [--as name] <title> [--json]"
+		return "tofu boardy new [--board KEY] [--type story|task|bug|subtask] [--priority P0..P4] [--status s] [--points n] [--size S|M|L] [--spec path] [--owns a,b] [--scope text] [--acceptance text] [--as name] <title> [--json]"
 	case "list":
-		return "tofu boardy list [--board KEY] [--status s] [--all] [--json]"
+		return "tofu boardy list [--board KEY] [--status s] [--all] [--fields id,status,assignee,owns] [--json]"
+	case "held":
+		return "tofu boardy held <path> [--json]"
 	case "show":
 		return "tofu boardy show <ticket> [--json]"
 	case "move":
@@ -41,6 +46,7 @@ func boardyUsageOf(subcommand string) string {
 
 type boardyCall struct {
 	o       verbOutput
+	dir     string
 	managed boardy.Managed
 	actor   string
 	store   boardy.Store
@@ -82,7 +88,7 @@ func boardyVerb(args []string, out, errOut io.Writer) int {
 		return o.fail(err)
 	}
 	actor, person := boardyIdentity(flags["as"])
-	call := boardyCall{o: o, managed: boardy.Managed{Local: boardy.Local{Store: store}, Person: person}, actor: actor, store: store, words: flow.Words(), flags: flags, args: rest}
+	call := boardyCall{o: o, dir: dir, managed: boardy.Managed{Local: boardy.Local{Store: store}, Person: person}, actor: actor, store: store, words: flow.Words(), flags: flags, args: rest}
 	switch args[0] {
 	case "manager", "triage", "hand", "assign", "widen", "check":
 		return call.manage(args[0])
@@ -108,6 +114,8 @@ func boardyVerb(args []string, out, errOut io.Writer) int {
 		return call.log()
 	case "lint":
 		return call.lint()
+	case "held":
+		return call.held()
 	}
 	return call.boards()
 }
@@ -169,7 +177,7 @@ func (c boardyCall) create() int {
 	if err != nil {
 		return c.o.fail(err)
 	}
-	ticket := boardy.Ticket{Front: boardy.Front{Title: title, Owns: splitList(c.flags["owns"])}}
+	ticket := boardy.Ticket{Front: boardy.Front{Title: title, Owns: splitList(c.flags["owns"]), Spec: c.flags["spec"]}, Scope: c.flags["scope"]}
 	if acceptance := c.flags["acceptance"]; acceptance != "" {
 		ticket.Acceptance = []string{acceptance}
 	}
@@ -190,6 +198,8 @@ func (c boardyCall) create() int {
 		ticket.Points, err = strconv.Atoi(raw)
 		parseErrs = append(parseErrs, err)
 	}
+	ticket.Size, err = boardy.ParseSize(c.flags["size"])
+	parseErrs = append(parseErrs, err)
 	if err := errors.Join(parseErrs...); err != nil {
 		return c.o.usage(err)
 	}
@@ -221,7 +231,15 @@ func splitList(raw string) []string {
 	return values
 }
 
+func (c boardyCall) hidden(status boardy.Status) bool {
+	wanted := c.flags["status"]
+	return wanted != "" && string(status) != wanted || wanted == "" && c.flags["all"] == "" && !status.Live()
+}
+
 func (c boardyCall) list() int {
+	if fields := c.flags["fields"]; fields != "" {
+		return c.listFields(splitList(fields))
+	}
 	key, err := c.board()
 	var tickets []boardy.Ticket
 	if err == nil {
@@ -230,10 +248,7 @@ func (c boardyCall) list() int {
 	if err != nil {
 		return c.o.fail(err)
 	}
-	wanted := c.flags["status"]
-	tickets = slices.DeleteFunc(tickets, func(t boardy.Ticket) bool {
-		return wanted != "" && string(t.Status) != wanted || wanted == "" && c.flags["all"] == "" && !t.Status.Live()
-	})
+	tickets = slices.DeleteFunc(tickets, func(t boardy.Ticket) bool { return c.hidden(t.Status) })
 	report := boardyList{Board: key, Words: c.words, Tickets: tickets}
 	return c.o.done(true, report, func(page cli.Page) []string {
 		lines := page.Title(key, []string{c.words.Board, plural(len(tickets), c.words.Ticket)}, cli.Verdict{})
@@ -245,6 +260,79 @@ func (c boardyCall) list() int {
 			rows = append(rows, cli.Row{Mark: statusMark(t.Status), Cells: []string{t.ID, string(t.Status), string(t.Priority), dash(t.Sprint), dash(t.Assignee), t.Title}})
 		}
 		return append(lines, page.Rows(rows)...)
+	})
+}
+
+func (c boardyCall) listFields(fields []string) int {
+	shape := reflect.TypeFor[boardy.Front]()
+	known := make([]string, shape.NumField())
+	for i := range known {
+		known[i], _, _ = strings.Cut(shape.Field(i).Tag.Get("json"), ",")
+	}
+	for _, field := range fields {
+		if !slices.Contains(known, field) {
+			return c.o.usage(fmt.Errorf("%q is not a front matter field: %s", field, strings.Join(known, ", ")))
+		}
+	}
+	key, err := c.board()
+	var fronts []boardy.Front
+	if err == nil {
+		fronts, err = c.store.Fronts(key)
+	}
+	if err != nil {
+		return c.o.fail(err)
+	}
+	picked := []map[string]any{}
+	var marks []cli.Mark
+	for _, front := range fronts {
+		if c.hidden(front.Status) {
+			continue
+		}
+		marks = append(marks, statusMark(front.Status))
+		raw, _ := json.Marshal(front)
+		var all map[string]any
+		_ = json.Unmarshal(raw, &all)
+		one := map[string]any{}
+		for _, field := range fields {
+			one[field] = all[field]
+		}
+		picked = append(picked, one)
+	}
+	return c.o.done(true, map[string]any{"board": key, "tickets": picked}, func(page cli.Page) []string {
+		rows := []cli.Row{{Cells: fields}}
+		for at, one := range picked {
+			cells := make([]string, len(fields))
+			for i, field := range fields {
+				text, isText := one[field].(string)
+				if !isText && one[field] != nil {
+					raw, _ := json.Marshal(one[field])
+					text = string(raw)
+				}
+				cells[i] = dash(text)
+			}
+			rows = append(rows, cli.Row{Mark: marks[at], Cells: cells})
+		}
+		return append(page.Title(key, []string{c.words.Board, plural(len(picked), c.words.Ticket)}, cli.Verdict{}), page.Rows(rows)...)
+	})
+}
+
+func (c boardyCall) held() int {
+	if len(c.args) != 1 {
+		return c.o.usage(errors.New("name one path"))
+	}
+	path := c.args[0]
+	if rel, err := filepath.Rel(c.dir, path); filepath.IsAbs(path) && err == nil && filepath.IsLocal(rel) {
+		path = rel
+	}
+	hold, err := c.store.Held(filepath.ToSlash(path))
+	if err != nil {
+		return c.o.fail(err)
+	}
+	return c.o.done(true, hold, func(page cli.Page) []string {
+		if !hold.Held {
+			return []string{page.Receipt(cli.Idle, hold.Path+" is not held", "")}
+		}
+		return []string{page.Receipt(cli.Active, hold.Path+" is held by "+hold.Ticket+" ("+string(hold.Status)+") through "+hold.Glob, "")}
 	})
 }
 
@@ -287,6 +375,8 @@ func (c boardyCall) show() int {
 			{Label: c.words.Epic, Text: dash(ticket.Epic)},
 			{Label: c.words.Sprint, Text: dash(ticket.Sprint)},
 			{Label: c.words.Points, Text: strconv.Itoa(ticket.Points)},
+			{Label: "size", Text: dash(string(ticket.Size))},
+			{Label: "spec", Text: dash(ticket.Spec)},
 			{Label: "owns", Text: strings.Join(ticket.Owns, ", ")},
 			{Label: "depends", Text: strings.Join(ticket.Depends, ", ")},
 			{Label: "updated", Text: ticket.Updated.Local().Format(time.DateTime)},

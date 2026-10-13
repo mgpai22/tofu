@@ -13,7 +13,7 @@ its own tickets from 1: `DEMO-1`, `DEMO-2`, `OPS-1`.
 
 A ticket has front matter (type, status, assignee, priority P0 to P4,
 points, owns, depends, blocks, relates, duplicates, epic, sprint, labels,
-component) and four sections: Problem, Scope, Acceptance and Log. A ticket
+component, spec, size S, M or L) and four sections: Problem, Scope, Acceptance and Log. A ticket
 that goes back from review to doing gets a numbered acceptance revision,
 `Acceptance 2`, so every round keeps its own list.
 
@@ -79,9 +79,14 @@ reaches a prompt.
     tofu boardy list
     tofu boardy show DEMO-1
     tofu boardy lint
+    tofu boardy held cmd/tofu/main.go --json
 
 `list` shows the live tickets; `--all` adds done and dropped, and
-`--status review` shows one status. `lint` reads every ticket on every
+`--status review` shows one status. `--fields id,status,assignee,owns`
+prints only those front matter fields, read without the ticket bodies.
+`held <path>` names the ticket holding a path, on any board of the project,
+and the glob that matched, or says it is not held; a hook asks it before a
+write. `lint` reads every ticket on every
 board and exits 1 on a front matter error, a reference to a ticket no board
 holds, a blocked ticket with no reason, a counter behind its tickets, or two
 doing tickets whose owns overlap, naming both: `x/*.go` and `x/*_test.go`

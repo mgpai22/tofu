@@ -25,14 +25,15 @@ Outside one the command line is the person, named by `--as`.
 Every move checks, in order:
 
 - The actor's role allows it.
-- A move to doing, review or done has an Acceptance; review has a Log.
+- A move to doing, review or done has an Acceptance; review has a Log of at least `log_to_review` characters, one when unset.
+- A create or a widen has a Scope naming one of `scope_cites`, when the board sets it.
 - A create, a widen, or a move to doing has owns disjoint from every doing ticket on every board of the project; the refusal names the ticket. Tickets in other statuses keep their owns as a record and are not checked.
 - The ticket's depends, blocks, relates and duplicates resolve.
 - The board's rules for the event pass.
 
 ## Where it lives
 
-- `boards/<KEY>/board.toml`: the managers, one per line of its list, and `holds`, the statuses whose owns are held (`["doing"]` when absent).
+- `boards/<KEY>/board.toml`: the managers, one per line of its list, and `holds`, the statuses whose owns are held (`["doing"]` when absent). Two optional board rules: `log_to_review = 200` and `scope_cites = ["docs/research/", "no source"]`.
 - `boards/<KEY>/triage/T<n>.json`: one waiting request each.
 - `boards/<KEY>/rules/`: the board's rule files.
 - `boards/<KEY>/events.jsonl`: one line per create, move, accept, hand and wait.
@@ -67,8 +68,10 @@ Shadow rules never stop a move.
     tofu boardy triage list
     tofu boardy check create|move|widen|close <ticket> [--to status]
 
-`tofu boardy check` runs the same rules a move runs, for an outside hook,
-and exits 1 when one stops it. A refused move prints why and exits 1:
+`tofu boardy check` runs every check the real command runs, role, owns,
+Acceptance, Log, references and rules, writes nothing, and exits 1 with
+the same refusal the command would print. A refused move prints why and
+exits 1:
 
     x DEMO-4 refused: it is assigned to "s-other", and an agent moves only its own ticket
 

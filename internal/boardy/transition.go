@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"tofu/internal/rule"
 )
@@ -24,10 +25,11 @@ func (m Managed) Create(key string, ticket Ticket, actor string) (Ticket, error)
 }
 
 func (m Managed) create(key string, ticket Ticket, actor, replaces string) (Ticket, error) {
-	if err := m.referencesResolve(ticket); err != nil {
+	board, err := m.Store.Board(key)
+	if err != nil {
 		return Ticket{}, err
 	}
-	if err := m.ownsFree(key, ticket.ID, ticket.Owns, cmp.Or(ticket.Status, Backlog), replaces); err != nil {
+	if err := m.vetCreate(board, ticket, cmp.Or(ticket.Status, Backlog), replaces); err != nil {
 		return Ticket{}, err
 	}
 	preview, err := os.CreateTemp(m.Store.BoardDir(key), ".tofu-create-*.md")
@@ -50,20 +52,68 @@ func (m Managed) Move(id string, to Status, reason, actor string) (Ticket, error
 	if err != nil {
 		return ticket, err
 	}
-	if err := m.mayMove(m.role(board, actor), ticket, to, actor); err != nil {
-		return ticket, err
-	}
-	if err := m.validMove(board, ticket, to); err != nil {
-		return ticket, err
-	}
-	event := rule.EventMove
-	if !to.Live() {
-		event = rule.EventClose
-	}
-	if err := m.gate(board.Key, m.boardEvent(event, ticket, to, actor)); err != nil {
+	e := m.moveEvent(ticket, to, actor)
+	fired, err := m.vetMove(board, ticket, e)
+	if err = errors.Join(m.Store.recordFired(board.Key, e, fired), err); err != nil {
 		return ticket, err
 	}
 	return m.Local.Move(id, to, reason, actor)
+}
+
+func (m Managed) Check(event rule.Event, id string, to Status, actor string) ([]Fired, error) {
+	ticket, board, err := m.ticketOnBoard(id)
+	if err != nil {
+		return nil, err
+	}
+	to = cmp.Or(to, ticket.Status)
+	switch event {
+	case rule.EventMove, rule.EventClose:
+		return m.vetMove(board, ticket, m.moveEvent(ticket, to, actor))
+	case rule.EventCreate:
+		err = m.vetCreate(board, ticket, to, "")
+	case rule.EventWiden:
+		err = m.mayWiden(board, ticket, actor)
+	default:
+		return nil, fmt.Errorf("%q is not a board event", event)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return m.Store.fire(board.Key, m.boardEvent(event, ticket, to, actor))
+}
+
+func (m Managed) moveEvent(ticket Ticket, to Status, actor string) rule.BoardEvent {
+	if !to.Live() {
+		return m.boardEvent(rule.EventClose, ticket, to, actor)
+	}
+	return m.boardEvent(rule.EventMove, ticket, to, actor)
+}
+
+func (m Managed) vetMove(board Board, ticket Ticket, e rule.BoardEvent) ([]Fired, error) {
+	if err := m.mayMove(m.role(board, e.Actor), ticket, Status(e.To), e.Actor); err != nil {
+		return nil, err
+	}
+	if err := m.validMove(board, ticket, Status(e.To)); err != nil {
+		return nil, err
+	}
+	return m.Store.fire(board.Key, e)
+}
+
+func (m Managed) vetCreate(board Board, ticket Ticket, status Status, replaces string) error {
+	if err := m.referencesResolve(ticket); err != nil {
+		return err
+	}
+	if err := board.cited(ticket); err != nil {
+		return err
+	}
+	return m.ownsFree(board.Key, ticket.ID, ticket.Owns, status, replaces)
+}
+
+func (m Managed) mayWiden(board Board, ticket Ticket, actor string) error {
+	if err := m.Manages(board.Key, actor, "widen owns"); err != nil {
+		return err
+	}
+	return board.cited(ticket)
 }
 
 func (m Managed) Comment(id, text, actor string) (Ticket, error) {
@@ -82,7 +132,7 @@ func (m Managed) Widen(id string, owns []string, actor string) (Ticket, error) {
 	if err != nil {
 		return ticket, err
 	}
-	if err := m.Manages(board.Key, actor, "widen owns"); err != nil {
+	if err := m.mayWiden(board, ticket, actor); err != nil {
 		return ticket, err
 	}
 	added := slices.DeleteFunc(slices.Clone(owns), func(glob string) bool { return slices.Contains(ticket.Owns, glob) })
@@ -144,8 +194,8 @@ func (m Managed) validMove(board Board, ticket Ticket, to Status) error {
 	if slices.Contains([]Status{Doing, Review, Done}, to) && !slices.ContainsFunc(ticket.Acceptance, func(lines string) bool { return strings.TrimSpace(lines) != "" }) {
 		return RefusedError{Ticket: ticket.ID, Why: fmt.Sprintf("it has no Acceptance, and a ticket reaches %s only with one", to)}
 	}
-	if to == Review && strings.TrimSpace(ticket.Log) == "" {
-		return RefusedError{Ticket: ticket.ID, Why: "its Log has no evidence, and a ticket reaches review with its evidence in the Log"}
+	if need, have := max(board.LogToReview, 1), utf8.RuneCountInString(strings.TrimSpace(ticket.Log)); to == Review && have < need {
+		return RefusedError{Ticket: ticket.ID, Why: fmt.Sprintf("its Log has %d characters of evidence, and a ticket reaches review on %s with at least %d", have, board.Key, need)}
 	}
 	var err error
 	if to == Doing || (!ticket.Status.Live() && to.Live()) {
@@ -180,11 +230,11 @@ func (m Managed) ownsFree(key, id string, owns []string, status Status, replaces
 		return nil
 	}
 	for _, board := range boards {
-		tickets, err := m.Store.Tickets(board.Key)
+		fronts, err := m.Store.Fronts(board.Key)
 		if err != nil {
 			return err
 		}
-		for _, held := range tickets {
+		for _, held := range fronts {
 			if held.ID == id || held.ID == replaces || !board.Holding(held.Status) {
 				continue
 			}

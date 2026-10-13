@@ -60,53 +60,56 @@ func (s Store) BoardRules(key string) ([]rule.Rule, error) {
 	return rules, nil
 }
 
-func (s Store) Check(key string, e rule.BoardEvent) ([]Fired, error) {
+func (f Fired) waits() bool { return f.Blocked && f.Checker == rule.CheckerPersonApproves }
+
+func (s Store) fire(key string, e rule.BoardEvent) ([]Fired, error) {
 	rules, err := s.BoardRules(key)
 	if err != nil {
 		return nil, err
 	}
 	var fired []Fired
+	var refusals []string
+	var waits error
 	for _, r := range rules {
 		if !r.Trigger.FiresOn(e) {
 			continue
 		}
 		fire, err := rule.Run(r, rule.Builtins(), e, e.Ticket, time.Now())
 		if err != nil {
-			return fired, err
+			return nil, err
 		}
-		if len(fire.Findings) > 0 {
-			fired = append(fired, Fired{Fire: fire, Checker: r.Checker})
+		if len(fire.Findings) == 0 {
+			continue
+		}
+		f := Fired{Fire: fire, Checker: r.Checker}
+		fired = append(fired, f)
+		switch {
+		case f.waits():
+			waits = WaitingError{Ticket: e.Ticket, Rule: f.RuleID, Detail: f.Text()}
+		case f.Blocked:
+			refusals = append(refusals, f.RuleID+": "+f.Text())
 		}
 	}
-	return fired, nil
+	if refusals != nil {
+		return fired, RefusedError{Ticket: e.Ticket, Why: strings.Join(refusals, "; ")}
+	}
+	return fired, waits
+}
+
+func (s Store) recordFired(key string, e rule.BoardEvent, fired []Fired) error {
+	var err error
+	for _, f := range fired {
+		kind := RuleFired
+		if f.waits() {
+			kind = Waiting
+		}
+		err = errors.Join(err, s.Record(key, Event{Ticket: e.Ticket, Kind: kind, Actor: e.Actor, To: Status(e.To),
+			Text: fmt.Sprintf("%s (%s, %s): %s", f.RuleID, f.Mode, e.Event, f.Text())}))
+	}
+	return err
 }
 
 func (m Managed) gate(key string, e rule.BoardEvent) error {
-	fired, err := m.Store.Check(key, e)
-	if err != nil {
-		return err
-	}
-	var refusals []string
-	var waits *WaitingError
-	for _, f := range fired {
-		kind := RuleFired
-		switch {
-		case !f.Blocked:
-		case f.Checker == rule.CheckerPersonApproves:
-			kind, waits = Waiting, &WaitingError{Ticket: e.Ticket, Rule: f.RuleID, Detail: f.Text()}
-		default:
-			refusals = append(refusals, f.RuleID+": "+f.Text())
-		}
-		err = errors.Join(err, m.Store.Record(key, Event{Ticket: e.Ticket, Kind: kind, Actor: e.Actor, To: Status(e.To),
-			Text: fmt.Sprintf("%s (%s, %s): %s", f.RuleID, f.Mode, e.Event, f.Text())}))
-	}
-	switch {
-	case err != nil:
-		return err
-	case refusals != nil:
-		return RefusedError{Ticket: e.Ticket, Why: strings.Join(refusals, "; ")}
-	case waits != nil:
-		return *waits
-	}
-	return nil
+	fired, err := m.Store.fire(key, e)
+	return errors.Join(m.Store.recordFired(key, e, fired), err)
 }

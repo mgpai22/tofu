@@ -26,12 +26,14 @@ const (
 func Collections() []string { return []string{"epics", "milestones", "sprints"} }
 
 type Board struct {
-	Key      string    `json:"key"`
-	Name     string    `json:"name"`
-	Managers []string  `json:"managers,omitempty"`
-	Holds    []Status  `json:"holds"`
-	Created  time.Time `json:"created"`
-	Dir      string    `json:"dir"`
+	Key         string    `json:"key"`
+	Name        string    `json:"name"`
+	Managers    []string  `json:"managers,omitempty"`
+	Holds       []Status  `json:"holds"`
+	LogToReview int       `json:"log_to_review,omitempty"`
+	ScopeCites  []string  `json:"scope_cites,omitempty"`
+	Created     time.Time `json:"created"`
+	Dir         string    `json:"dir"`
 }
 
 func (b Board) Holding(status Status) bool { return slices.Contains(b.Holds, status) }
@@ -114,14 +116,28 @@ func (s Store) SaveBoard(board Board) error {
 
 func (b Board) toml() []byte {
 	quote := func(value any) string { raw, _ := json.Marshal(value); return string(raw) }
-	return fmt.Appendf(nil, "key = %s\nname = %s\nmanagers = %s\nholds = %s\ncreated = %s\n",
+	raw := fmt.Appendf(nil, "key = %s\nname = %s\nmanagers = %s\nholds = %s\ncreated = %s\n",
 		quote(b.Key), quote(b.Name), quote(append([]string{}, b.Managers...)), quote(b.Holds), quote(b.Created.UTC().Format(time.RFC3339)))
+	if b.LogToReview > 0 {
+		raw = fmt.Appendf(raw, "log_to_review = %d\n", b.LogToReview)
+	}
+	if len(b.ScopeCites) > 0 {
+		raw = fmt.Appendf(raw, "scope_cites = %s\n", quote(b.ScopeCites))
+	}
+	return raw
+}
+
+func (b Board) cited(ticket Ticket) error {
+	if len(b.ScopeCites) == 0 || slices.ContainsFunc(b.ScopeCites, func(cite string) bool { return strings.Contains(ticket.Scope, cite) }) {
+		return nil
+	}
+	return RefusedError{Ticket: ticket.ID, Why: fmt.Sprintf("its Scope names no source, and %s wants one of: %s", b.Key, strings.Join(b.ScopeCites, ", "))}
 }
 
 func parseBoard(raw []byte) (Board, error) {
 	var board Board
 	var created string
-	fields := map[string]any{"key": &board.Key, "name": &board.Name, "managers": &board.Managers, "holds": &board.Holds, "created": &created}
+	fields := map[string]any{"key": &board.Key, "name": &board.Name, "managers": &board.Managers, "holds": &board.Holds, "created": &created, "log_to_review": &board.LogToReview, "scope_cites": &board.ScopeCites}
 	for line := range strings.Lines(string(raw)) {
 		if line = strings.TrimSpace(line); line == "" || strings.HasPrefix(line, "#") {
 			continue
@@ -171,10 +187,7 @@ func ReadTicket(path string) (Ticket, error) {
 	if err != nil {
 		return ticket, fmt.Errorf("%s: %w", filepath.Base(path), err)
 	}
-	if want := strings.TrimSuffix(filepath.Base(path), ".md"); ticket.ID != want {
-		return ticket, fmt.Errorf("%s: its front matter says id %s", filepath.Base(path), ticket.ID)
-	}
-	return ticket, nil
+	return ticket, namedFor(path, ticket.ID)
 }
 
 func (s Store) TicketFiles(key string) ([]string, error) {

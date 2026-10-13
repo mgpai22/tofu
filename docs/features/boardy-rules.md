@@ -2,7 +2,7 @@
 title: Boardy managers and rules
 description: Who may create, move and close a ticket on a boardy board, how other sessions ask through triage, how a ticket moves to another board, and board rules that stop a move.
 order: 19
-updated: 2026-10-09
+updated: 2026-10-13
 ---
 
 A boardy board has managers. A manager creates, assigns, accepts and closes
@@ -102,13 +102,27 @@ to: review
 rule in `shadow` mode never stops a move; what it found goes in
 `events.jsonl`.
 
-An outside hook runs the same rules:
+Two board rules need no file. Set them in `board.toml`:
 
 ```
-tofu boardy check move DEMO-7 --to review
+log_to_review = 200
+scope_cites = ["docs/research/", "no source"]
 ```
 
-It exits 1 when an enforced rule stops the move.
+The first refuses a move to review while the Log has fewer than 200
+characters; the second refuses a create or a widen whose Scope names none of
+the listed sources. Unset, a review needs any Log and a Scope may say
+anything.
+
+An outside hook runs every check the real command runs, role, owns,
+Acceptance, Log, references and rules, and writes nothing:
+
+```
+tofu boardy check move DEMO-7 --to doing
+```
+
+It exits 1 with the same refusal the move would print, such as
+`DEMO-7 refused: cmd/tofu/boardy*.go overlaps cmd/tofu/**, held by OPS-1 (doing)`.
 
 ## Who is acting
 
@@ -123,6 +137,6 @@ the person, named by `--as`.
 
 - Roles: manager (named in `board.toml`), the person and the lead session acting for them, and every sub-agent or other session as an agent.
 - Moves an agent may make: its own ticket, doing to review, with a Log.
-- A move to doing, review or done needs an Acceptance; review also needs a Log.
+- A move to doing, review or done needs an Acceptance; review also needs a Log, of at least `log_to_review` characters when the board sets it.
 - Triage requests live in `boards/<KEY>/triage/T<n>.json` until accepted or dropped.
 - Every accept, drop, hand, widen, assign and rule that fired is a line in `events.jsonl`.

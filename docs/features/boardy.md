@@ -2,7 +2,7 @@
 title: Boardy
 description: Your own Jira or Linear, kept as markdown files on your disk, with numbered tickets, statuses and a lint that catches two tickets claiming one file.
 order: 18
-updated: 2026-10-09
+updated: 2026-10-13
 ---
 
 Boardy is a ticket board that lives in files. Each project can hold several
@@ -57,6 +57,16 @@ tofu boardy list
 tofu boardy boards
 tofu boardy lint
 ```
+
+Ask what a hook asks, fast, without reading ticket bodies:
+
+```
+tofu boardy held cmd/tofu/main.go --json
+tofu boardy list --fields id,status,assignee,owns --json
+```
+
+`held` answers `{"held": true, "ticket": "OPS-1", "status": "doing", "glob": "cmd/tofu/**"}`
+from any board of the project, or `{"held": false}`.
 
 A second board in the same project, `tofu boardy init --key OPS`, counts
 from `OPS-1`. With two boards, `new` and `list` take `--board KEY`.
@@ -135,8 +145,9 @@ the lead gives it.
 | Command | Does |
 |---|---|
 | `tofu boardy init --key KEY [--name text]` | makes a board |
-| `tofu boardy new [--board KEY] [--type t] [--priority P0..P4] [--status s] [--points n] [--owns a,b] [--acceptance text] [--as name] <title>` | makes a ticket with the next number |
-| `tofu boardy list [--board KEY] [--status s] [--all]` | lists live tickets |
+| `tofu boardy new [--board KEY] [--type t] [--priority P0..P4] [--status s] [--points n] [--size S\|M\|L] [--spec path] [--owns a,b] [--scope text] [--acceptance text] [--as name] <title>` | makes a ticket with the next number |
+| `tofu boardy list [--board KEY] [--status s] [--all] [--fields id,status,assignee,owns]` | lists live tickets, or only the named front matter fields |
+| `tofu boardy held <path>` | names the ticket holding a path on any board, and the glob, or says it is not held |
 | `tofu boardy show <ticket>` | prints one ticket |
 | `tofu boardy move <ticket> <status> [--reason text]` | changes its status |
 | `tofu boardy log <ticket> <text>` | appends a dated line to its Log |

@@ -78,6 +78,23 @@ func ParsePriority(raw string) (Priority, error) {
 	return Priority(raw), nil
 }
 
+type Size string
+
+const (
+	SizeS Size = "S"
+	SizeM Size = "M"
+	SizeL Size = "L"
+)
+
+func (Size) Enum() []string { return enum(SizeS, SizeM, SizeL) }
+
+func ParseSize(raw string) (Size, error) {
+	if raw != "" && !slices.Contains(Size("").Enum(), raw) {
+		return "", fmt.Errorf("%q is not a size: S, M or L", raw)
+	}
+	return Size(raw), nil
+}
+
 type Front struct {
 	ID         string    `json:"id"`
 	Title      string    `json:"title"`
@@ -96,6 +113,8 @@ type Front struct {
 	Sprint     string    `json:"sprint,omitempty"`
 	Labels     []string  `json:"labels,omitempty"`
 	Component  string    `json:"component,omitempty"`
+	Spec       string    `json:"spec,omitempty"`
+	Size       Size      `json:"size,omitempty"`
 	Created    time.Time `json:"created"`
 	Updated    time.Time `json:"updated"`
 }
@@ -148,6 +167,12 @@ func (t Ticket) Markdown() []byte {
 	scalar("sprint", t.Sprint)
 	list("labels", t.Labels)
 	scalar("component", t.Component)
+	if t.Spec != "" {
+		scalar("spec", t.Spec)
+	}
+	if t.Size != "" {
+		scalar("size", string(t.Size))
+	}
 	scalar("created", t.Created.UTC().Format(time.RFC3339))
 	scalar("updated", t.Updated.UTC().Format(time.RFC3339))
 	b.WriteString("---\n")
@@ -257,6 +282,10 @@ func (t *Ticket) set(key, value string) error {
 		err = list(&t.Labels)
 	case "component":
 		t.Component = value
+	case "spec":
+		t.Spec = value
+	case "size":
+		t.Size, err = ParseSize(value)
 	case "created":
 		t.Created, err = time.Parse(time.RFC3339, value)
 	case "updated":
