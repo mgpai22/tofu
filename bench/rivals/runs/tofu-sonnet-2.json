@@ -1,0 +1,153 @@
+{
+  "arm": "tofu-sonnet",
+  "rep": 2,
+  "tool": "tofu",
+  "version": "version   0.5.13-fix1+dev",
+  "asked_model": "claude-sub/claude-sonnet-5-5",
+  "model": "claude-sonnet-5-5",
+  "models": [
+    "claude-sonnet-5-5"
+  ],
+  "credential": "tofu's own claude-sub login, spend subscription windows 5h and 7d, no money",
+  "posture": "--wire anthropic --gate shadow --no-instructions, real home for the login, scratch project folder",
+  "date": "2026-10-13 16:40",
+  "machine": "windows/amd64, 32 logical CPUs",
+  "exit_code": 0,
+  "wall_ms": 63086,
+  "tree": {
+    "cpu_ms": 52953,
+    "peak_tree_rss_bytes": 417959936,
+    "peak_commit_bytes": 567148544,
+    "processes": 427,
+    "left_running_at_exit": 0
+  },
+  "tokens": {
+    "fresh_in": 1194,
+    "cache_read": 221172,
+    "cache_write": 11875,
+    "out": 3729
+  },
+  "requests": 11,
+  "calls": [
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 2440,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": -1,
+      "failed": true
+    },
+    {
+      "kind": "spawn",
+      "name": "spawn",
+      "ms": 33,
+      "failed": false
+    },
+    {
+      "kind": "edit",
+      "name": "edit",
+      "ms": 4,
+      "failed": false
+    },
+    {
+      "kind": "edit",
+      "name": "edit",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "edit",
+      "name": "edit",
+      "ms": 4,
+      "failed": false
+    },
+    {
+      "kind": "edit",
+      "name": "edit",
+      "ms": 3,
+      "failed": false
+    },
+    {
+      "kind": "edit",
+      "name": "edit",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "edit",
+      "name": "edit",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "write",
+      "name": "write",
+      "ms": 7,
+      "failed": false
+    },
+    {
+      "kind": "write",
+      "name": "write",
+      "ms": 11,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": -1,
+      "failed": true
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": -1,
+      "failed": true
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": -1,
+      "failed": true
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 15657,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 1582,
+      "failed": false
+    }
+  ],
+  "retried": 4,
+  "score": {
+    "hidden": {
+      "bug": true,
+      "feature": true,
+      "newfile": true,
+      "rename": true,
+      "search": true
+    },
+    "rubric": {
+      "go vet clean": true,
+      "gofmt clean": true,
+      "no stray files": true,
+      "old name gone": false,
+      "visible tests pass": true
+    },
+    "files_changed": 8,
+    "lines_added": 40,
+    "lines_deleted": 5
+  },
+  "notes": [
+    "turn outcome stopped",
+    "1 sub-agents"
+  ]
+}

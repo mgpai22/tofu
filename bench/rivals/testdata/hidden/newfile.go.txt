@@ -1,0 +1,26 @@
+package shop
+
+import (
+	"bytes"
+	"os"
+	"testing"
+)
+
+func TestHiddenNewFile(t *testing.T) {
+	if _, err := os.Stat("export.go"); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	items := []Item{{SKU: "a", Price: 250, Qty: 2}, {SKU: "b", Price: 5, Qty: 3}}
+	if err := ExportCSV(&out, items); err != nil {
+		t.Fatal(err)
+	}
+	want := "sku,qty,price,line_total\na,2,2.50,5.00\nb,3,0.05,0.15\n"
+	if out.String() != want {
+		t.Fatalf("got %q", out.String())
+	}
+	out.Reset()
+	if err := ExportCSV(&out, nil); err != nil || out.String() != "sku,qty,price,line_total\n" {
+		t.Fatalf("empty: %q, %v", out.String(), err)
+	}
+}

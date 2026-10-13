@@ -1,0 +1,33 @@
+package shop
+
+import (
+	"errors"
+	"testing"
+)
+
+func TestHiddenFeature(t *testing.T) {
+	inv := NewInventory()
+	if err := inv.Remove("ghost", 1); !errors.Is(err, ErrUnknownSKU) {
+		t.Fatalf("unknown sku: got %v", err)
+	}
+	inv.Add("a", 3)
+	if err := inv.Remove("a", 5); !errors.Is(err, ErrInsufficient) {
+		t.Fatalf("too many: got %v", err)
+	}
+	if inv.Count("a") != 3 {
+		t.Fatalf("stock changed on a refused remove: %d", inv.Count("a"))
+	}
+	if err := inv.Remove("a", 2); err != nil {
+		t.Fatalf("remove 2 of 3: %v", err)
+	}
+	if inv.Count("a") != 1 {
+		t.Fatalf("stock after remove: %d", inv.Count("a"))
+	}
+	history := History()
+	if len(history) == 0 || history[len(history)-1] != "remove a x2" {
+		t.Fatalf("last history line: %v", history)
+	}
+	if err := inv.Remove("a", 1); err != nil || inv.Count("a") != 0 {
+		t.Fatalf("remove to zero: %v, %d", err, inv.Count("a"))
+	}
+}

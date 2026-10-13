@@ -1,0 +1,189 @@
+{
+  "arm": "tofu-gpt",
+  "rep": 2,
+  "tool": "tofu",
+  "version": "version   0.5.13-fix1+dev",
+  "asked_model": "codex-sub/gpt-5.6-sol",
+  "model": "gpt-5.6-sol",
+  "models": [
+    "gpt-5.6-sol"
+  ],
+  "credential": "tofu's own codex-sub login, spend subscription windows 5h and 7d, no money",
+  "posture": "--wire codex --gate shadow --no-instructions, real home for the login, scratch project folder",
+  "date": "2026-10-13 17:05",
+  "machine": "windows/amd64, 32 logical CPUs",
+  "exit_code": 0,
+  "wall_ms": 105151,
+  "tree": {
+    "cpu_ms": 45171,
+    "peak_tree_rss_bytes": 412323840,
+    "peak_commit_bytes": 539275264,
+    "processes": 326,
+    "left_running_at_exit": 0
+  },
+  "tokens": {
+    "fresh_in": 11111,
+    "cache_read": 197248,
+    "cache_write": 0,
+    "out": 1883
+  },
+  "requests": 12,
+  "calls": [
+    {
+      "kind": "other",
+      "name": "plan",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "project_report",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 386,
+      "failed": false
+    },
+    {
+      "kind": "search",
+      "name": "glob",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "search",
+      "name": "search",
+      "ms": 13,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "plan",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "tofu_docs",
+      "ms": 59,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 196,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "plan",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "rule_override",
+      "ms": 10,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "plan",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "plan",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 13771,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "plan",
+      "ms": 0,
+      "failed": false
+    }
+  ],
+  "retried": 0,
+  "score": {
+    "hidden": {
+      "bug": false,
+      "feature": false,
+      "newfile": false,
+      "rename": false,
+      "search": false
+    },
+    "rubric": {
+      "go vet clean": true,
+      "gofmt clean": true,
+      "no stray files": true,
+      "old name gone": false,
+      "visible tests pass": true
+    },
+    "files_changed": 0,
+    "lines_added": 0,
+    "lines_deleted": 0,
+    "failures": [
+      "hidden bug: hidden_bug_test.go:19: Page(5 items, 3, 2) = \"\", want \"e\"",
+      "hidden feature: .\\hidden_feature_test.go:10:16: inv.Remove undefined (type *Inventory has no field or method Remove)",
+      "hidden rename: .\\hidden_rename_test.go:10:14: c.Subtotal undefined (type Cart has no field or method Subtotal)",
+      "hidden search: hidden_search_test.go:12: open ANSWER.txt: The system cannot find the file specified.",
+      "hidden newfile: .\\hidden_newfile_test.go:15:12: undefined: ExportCSV"
+    ]
+  },
+  "notes": [
+    "turn outcome stopped"
+  ]
+}

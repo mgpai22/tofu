@@ -1,0 +1,9 @@
+This is a small Go package, example.com/shop. Do all five parts, then make sure go test ./... passes.
+
+1. Bug: Page(items, page, size) drops a partial last page. With 5 items, Page(items, 3, 2) must return the fifth item. A page past the end returns an empty result.
+2. Feature: add (inv *Inventory) Remove(sku string, qty int) error. It returns ErrUnknownSKU when the sku was never added, ErrInsufficient when qty is more than the stock and leaves the stock unchanged, and otherwise lowers the stock by qty and records the change the way Add does, with kind "remove".
+3. Rename the method Cart.CalcTotal to Cart.Subtotal everywhere, tests included.
+4. Question: find the unexported function that records each stock change and write only its name in a new file ANSWER.txt.
+5. New file export.go with func ExportCSV(w io.Writer, items []Item) error. It writes the header line sku,qty,price,line_total and then one line per item, prices formatted the way Money formats them, for example a,2,2.50,5.00. Every line ends in a newline.
+
+Keep the change small and add no other files except tests.

@@ -1,0 +1,22 @@
+package shop
+
+import "testing"
+
+func TestHiddenBug(t *testing.T) {
+	items := []Item{{SKU: "a"}, {SKU: "b"}, {SKU: "c"}, {SKU: "d"}, {SKU: "e"}}
+	cases := []struct {
+		page, size int
+		want       string
+	}{
+		{1, 2, "ab"}, {2, 2, "cd"}, {3, 2, "e"}, {4, 2, ""}, {1, 5, "abcde"}, {1, 9, "abcde"}, {2, 5, ""}, {0, 2, ""}, {1, 0, ""},
+	}
+	for _, c := range cases {
+		got := ""
+		for _, item := range Page(items, c.page, c.size) {
+			got += item.SKU
+		}
+		if got != c.want {
+			t.Errorf("Page(5 items, %d, %d) = %q, want %q", c.page, c.size, got, c.want)
+		}
+	}
+}

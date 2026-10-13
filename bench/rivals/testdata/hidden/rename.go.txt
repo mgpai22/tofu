@@ -1,0 +1,19 @@
+package shop
+
+import (
+	"reflect"
+	"testing"
+)
+
+func TestHiddenRename(t *testing.T) {
+	c := Cart{Items: []Item{{SKU: "a", Price: 250, Qty: 2}, {SKU: "b", Price: 99, Qty: 1}}}
+	if got := c.Subtotal(); got != 599 {
+		t.Fatalf("Subtotal = %d", got)
+	}
+	if got := c.DiscountedTotal(10); got != 540 {
+		t.Fatalf("DiscountedTotal = %d", got)
+	}
+	if _, still := reflect.TypeOf(Cart{}).MethodByName("CalcTotal"); still {
+		t.Fatal("CalcTotal still exists")
+	}
+}

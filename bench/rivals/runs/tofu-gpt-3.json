@@ -1,0 +1,495 @@
+{
+  "arm": "tofu-gpt",
+  "rep": 3,
+  "tool": "tofu",
+  "version": "version   0.5.13-fix1+dev",
+  "asked_model": "codex-sub/gpt-5.6-sol",
+  "model": "gpt-5.6-sol",
+  "models": [
+    "gpt-5.6-sol"
+  ],
+  "credential": "tofu's own codex-sub login, spend subscription windows 5h and 7d, no money",
+  "posture": "--wire codex --gate shadow --no-instructions, real home for the login, scratch project folder",
+  "date": "2026-10-13 17:09",
+  "machine": "windows/amd64, 32 logical CPUs",
+  "exit_code": 0,
+  "wall_ms": 333222,
+  "tree": {
+    "cpu_ms": 55828,
+    "peak_tree_rss_bytes": 428916736,
+    "peak_commit_bytes": 571805696,
+    "processes": 482,
+    "left_running_at_exit": 0
+  },
+  "tokens": {
+    "fresh_in": 83143,
+    "cache_read": 411136,
+    "cache_write": 0,
+    "out": 11170
+  },
+  "requests": 27,
+  "calls": [
+    {
+      "kind": "other",
+      "name": "project_report",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "search",
+      "name": "glob",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "tofu_docs",
+      "ms": 45,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 324,
+      "failed": true
+    },
+    {
+      "kind": "other",
+      "name": "rule_override",
+      "ms": 8,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 296,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_read",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 300,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_read",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 12,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 13,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 12,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 11,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 12,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 10,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 11,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "spawn",
+      "name": "spawn",
+      "ms": 62,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_read",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "search",
+      "name": "reference",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "search",
+      "name": "reference",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "search",
+      "name": "glob",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "write",
+      "name": "write",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "write",
+      "name": "write",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "write",
+      "name": "write",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "edit",
+      "name": "edit",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "edit",
+      "name": "edit",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "edit",
+      "name": "edit",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "edit",
+      "name": "edit",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "edit",
+      "name": "edit",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "edit",
+      "name": "edit",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "write",
+      "name": "write",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "write",
+      "name": "write",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "search",
+      "name": "search",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "search",
+      "name": "search",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": -1,
+      "failed": true
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": -1,
+      "failed": true
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": -1,
+      "failed": true
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": -1,
+      "failed": true
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 8048,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 6315,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 1433,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 210,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 188,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_log",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_log",
+      "ms": 10,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_log",
+      "ms": 9,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_log",
+      "ms": 11,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_log",
+      "ms": 11,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_log",
+      "ms": 10,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_log",
+      "ms": 8,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_move",
+      "ms": 3,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_read",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 0,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "search",
+      "name": "search",
+      "ms": 3,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 1508,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "tofu_lint_comments",
+      "ms": 57,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "read",
+      "name": "read",
+      "ms": 1,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_log",
+      "ms": 2,
+      "failed": false
+    },
+    {
+      "kind": "other",
+      "name": "ticket_log",
+      "ms": 8,
+      "failed": false
+    },
+    {
+      "kind": "bash",
+      "name": "bash",
+      "ms": 271,
+      "failed": false
+    }
+  ],
+  "retried": 5,
+  "score": {
+    "hidden": {
+      "bug": true,
+      "feature": true,
+      "newfile": true,
+      "rename": true,
+      "search": true
+    },
+    "rubric": {
+      "go vet clean": true,
+      "gofmt clean": true,
+      "no stray files": true,
+      "old name gone": true,
+      "visible tests pass": true
+    },
+    "files_changed": 11,
+    "lines_added": 148,
+    "lines_deleted": 7
+  },
+  "notes": [
+    "turn outcome stopped",
+    "1 sub-agents"
+  ]
+}

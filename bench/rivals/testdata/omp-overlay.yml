@@ -1,0 +1,18 @@
+modelRoles:
+  default: anthropic/claude-sonnet-5-5
+  task: anthropic/claude-sonnet-5-5
+disabledProviders:
+  - agent-plugins
+  - agents
+  - claude
+  - claude-md
+  - claude-plugins
+  - cline
+  - codex
+  - cursor
+  - gemini
+  - github
+  - mcp-json
+  - opencode
+  - vscode
+  - windsurf
