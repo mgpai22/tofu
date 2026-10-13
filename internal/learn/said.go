@@ -166,7 +166,7 @@ func readSitting(store *session.Store, header session.Header, read *Read) (sitti
 			one.worked = append(one.worked, spent)
 		case event.Kind == session.EventMessage && lead && json.Unmarshal(event.Body, &body) == nil:
 			one.spoken = append(one.spoken, spoken{at: event.At, body: body})
-			if body.Origin == originReport {
+			if strings.Contains(body.Origin, originReport) {
 				read.Reports++
 			}
 		}

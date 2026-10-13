@@ -1,0 +1,35 @@
+# three workers finishing close together and a fourth asking the lead between them; nobody answers the ask
+{"text":"spawning 4 workers","tools":[{"name":"spawn","args":{"task":"fan-in worker 1: run the one command you are given, then report","owns":["w1/**"]}},{"name":"spawn","args":{"task":"fan-in worker 2: run the one command you are given, then report","owns":["w2/**"]}},{"name":"spawn","args":{"task":"fan-in worker 3: run the one command you are given, then report","owns":["w3/**"]}},{"name":"spawn","args":{"task":"fan-in worker 4: run the one command you are given, then report","owns":["w4/**"]}}]}
+{"agent":"c1","tools":[{"name":"bash","args":{"command":"sleep 0.5"}}]}
+{"agent":"c1","text":"fanin report from c1 after 0.5 s"}
+{"agent":"c2","tools":[{"name":"bash","args":{"command":"sleep 1"}}]}
+{"agent":"c2","tools":[{"name":"glob","args":{"pattern":"**/*.go"}}]}
+{"agent":"c2","text":"fanin asker c2 was answered"}
+{"agent":"c3","tools":[{"name":"bash","args":{"command":"sleep 1.5"}}]}
+{"agent":"c3","text":"fanin report from c3 after 1.5 s"}
+{"agent":"c4","tools":[{"name":"bash","args":{"command":"sleep 2"}}]}
+{"agent":"c4","text":"fanin report from c4 after 2 s"}
+{"text":"lead turn reply 1"}
+{"text":"lead turn reply 2"}
+{"text":"lead turn reply 3"}
+{"text":"lead turn reply 4"}
+{"text":"lead turn reply 5"}
+{"text":"lead turn reply 6"}
+{"text":"lead turn reply 7"}
+{"text":"lead turn reply 8"}
+{"text":"lead turn reply 9"}
+{"text":"lead turn reply 10"}
+{"text":"lead turn reply 11"}
+{"text":"lead turn reply 12"}
+{"text":"lead turn reply 13"}
+{"text":"lead turn reply 14"}
+{"text":"lead turn reply 15"}
+{"text":"lead turn reply 16"}
+{"text":"lead turn reply 17"}
+{"text":"lead turn reply 18"}
+{"text":"lead turn reply 19"}
+{"text":"lead turn reply 20"}
+{"text":"lead turn reply 21"}
+{"text":"lead turn reply 22"}
+{"text":"lead turn reply 23"}
+{"text":"lead turn reply 24"}

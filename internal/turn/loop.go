@@ -583,7 +583,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 			}
 		}
 		if config.Inbox != nil {
-			for _, item := range config.Inbox.takeItems() {
+			for _, item := range config.Inbox.fold(config.TaskOrigin.Source) {
 				messages = append(messages, inserted(item.source, item.text, item.posted))
 				episode(episodeKind(item.source), item.text)
 				if item.source == sourceMemory {

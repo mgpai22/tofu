@@ -456,7 +456,7 @@ func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error
 	site.notice(site.agent, timing.words(subAgentID))
 	started = true
 	t.Inbox.hold(held, site.log)
-	go t.background(runCtx, cancel, held, opened, site, task, warm)
+	go t.background(runCtx, cancel, held, opened, site, task, llm.Origin{}, warm)
 	return Result{Content: narrowed + held.runningWords(), Command: subAgentID + " running: " + agent.Mission, SubAgent: subAgentID}, nil
 }
 
@@ -485,7 +485,7 @@ func (t *SpawnTool) artifactDir() (string, error) {
 
 const resumedWords = "resumed by a message"
 
-func (t *SpawnTool) background(ctx context.Context, cancel context.CancelFunc, held *heldSubAgent, opened SubAgentModel, site spawnSite, task string, warm *warmup) {
+func (t *SpawnTool) background(ctx context.Context, cancel context.CancelFunc, held *heldSubAgent, opened SubAgentModel, site spawnSite, task string, taskOrigin llm.Origin, warm *warmup) {
 	defer cancel()
 	defer warm.leaderDone(site.call)
 	if opened.Close != nil {
@@ -502,18 +502,21 @@ func (t *SpawnTool) background(ctx context.Context, cancel context.CancelFunc, h
 		return gateMissed(t.Project, projectRecipes(t.Project), held.definition, held.boundary.Owns(), []Row{run})
 	}}
 	defer t.watch(held, check)()
-	var taskOrigin llm.Origin
 	for {
 		subAgent := opened.onto(t.subAgentConfig(held, site, check))
 		subAgent.Task, subAgent.TaskOrigin, subAgent.NewID = task, taskOrigin, func() string { return held.agent.ID }
-		report := t.converse(ctx, held, warm.stagger(ctx, site.call, subAgent), site)
+		report, completion := t.converse(ctx, held, warm.stagger(ctx, site.call, subAgent), site)
 		next, _ := held.inbox.next(ctx, nil)
 		stopping := ctx.Err() != nil
 		if stopping {
 			_ = held.inbox.settle()
 		}
+		source := sourceReportForLead
+		if completion == subagent.Done && taskOrigin.Source == "" {
+			source = sourceReport
+		}
 		if stopping || len(next) == 0 {
-			next = t.Inbox.ended(held, report, stopping, site.log)
+			next = t.Inbox.ended(held, report, source, stopping, site.log)
 		}
 		if len(next) == 0 {
 			return
@@ -605,7 +608,7 @@ func (m SubAgentModel) onto(subAgent Config) Config {
 	return subAgent
 }
 
-func (t *SpawnTool) converse(ctx context.Context, held *heldSubAgent, subAgent Config, site spawnSite) string {
+func (t *SpawnTool) converse(ctx context.Context, held *heldSubAgent, subAgent Config, site spawnSite) (string, subagent.Completion) {
 	agent, trace := held.agent, held.trace
 	trace.site = site
 	subAgentCtx, release := context.WithCancel(ctx)
@@ -673,9 +676,9 @@ func (t *SpawnTool) converse(ctx context.Context, held *heldSubAgent, subAgent C
 	t.roster.Reached(agent.ID, state, text)
 	held.agent.State = state
 	if runErr != nil && state != subagent.Parked {
-		return fmt.Sprintf("sub-agent %s is %s: %v\n\n%s", agent.ID, state, runErr, text)
+		return fmt.Sprintf("sub-agent %s is %s: %v\n\n%s", agent.ID, state, runErr, text), report.Completion
 	}
-	return text
+	return text, report.Completion
 }
 
 func (t *SpawnTool) ticketActor(ticket string) string {

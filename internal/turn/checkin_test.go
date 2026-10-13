@@ -47,7 +47,7 @@ func noted(n int) []llm.Decision {
 	return said
 }
 
-func TestACheckOnASlowSubAgentWakesTheLeadAndNoneFollowsItsReport(t *testing.T) {
+func TestACheckOnASlowSubAgentNeverWakesTheLeadAndRidesWithItsReport(t *testing.T) {
 	model := newCrew(map[string][]llm.Decision{
 		leadKey:    append([]llm.Decision{spawnCall("call-spawn", usersRoute, "src/users.ts")}, noted(200)...),
 		usersRoute: {writeUsers(), claimDecision("the users route is added")},
@@ -56,31 +56,20 @@ func TestACheckOnASlowSubAgentWakesTheLeadAndNoneFollowsItsReport(t *testing.T) 
 	defer release()
 	lead, spawn := checkingLead(t, model, checkEvery)
 	led := startLead(context.Background(), lead, nil)
-	waitFor(t, "a lead turn started by a check", func() bool {
-		turns := led.turns()
-		return len(turns) >= 2 && strings.HasPrefix(turns[1].Task, "check on sub-1")
-	})
-	check := led.turns()[1].Task
-	for _, want := range []string{"steps since the last check: 1, of 1 in all", "files changed since then: src/users.ts", "last tool: write"} {
-		if !strings.Contains(check, want) {
-			t.Fatalf("the first check is %q, want it to say %q", check, want)
-		}
+	waitFor(t, "the sub-agent's held step", func() bool { return len(model.requests(usersRoute)) == 2 })
+	time.Sleep(10 * checkEvery)
+	if turns := led.turns(); len(turns) != 1 {
+		t.Fatalf("the lead ran %d turns while only checks arrived, want 1, its own", len(turns))
 	}
-	if asked := model.requests(leadKey); !strings.Contains(lastUser(asked[len(asked)-1]), "check on sub-1") {
-		t.Fatalf("the lead's latest request ends on %q, want the check", lastUser(asked[len(asked)-1]))
-	}
-	waitFor(t, "an idle check while the sub-agent's model call is held", func() bool {
-		for _, turn := range led.turns()[2:] {
-			if strings.Contains(turn.Task, "steps since the last check: none") {
-				return true
-			}
-		}
-		return false
-	})
 	release()
 	turns := led.wait(t)
-	if last := turns[len(turns)-1].Task; !strings.Contains(last, "sub-agent sub-1 is finished") {
-		t.Fatalf("the lead's last turn began on %q, want sub-1's report, with no check after it", last)
+	if len(turns) != 2 {
+		t.Fatalf("the lead ran %d turns, want 2, its own and the report's", len(turns))
+	}
+	for _, want := range []string{"sub-agent sub-1 is finished", "check on sub-1", "files changed since then: src/users.ts", "last tool: write"} {
+		if !strings.Contains(turns[1].Task, want) {
+			t.Fatalf("the report's turn began on %q, want it to carry %q", turns[1].Task, want)
+		}
 	}
 	time.Sleep(4 * checkEvery)
 	if left := spawn.Inbox.Take(); len(left) > 0 {
@@ -128,7 +117,7 @@ func TestAnUnreadCheckIsReplacedAndCountsFromTheLastOneRead(t *testing.T) {
 	if len(idle) != 1 || !strings.Contains(idle[0], "steps since the last check: none, and no step for 31m0s") {
 		t.Fatalf("a check after the lead read the last one is %q, want none since then and idle since the step at 3m", idle)
 	}
-	inbox.ended(held, "", false, nil)
+	inbox.ended(held, "", sourceReport, false, nil)
 	inbox.postCheck(held, check, nil, start.Add(64*time.Minute))
 	if after := inbox.Take(); len(after) > 0 {
 		t.Fatalf("a check on an ended sub-agent was posted: %q", after)

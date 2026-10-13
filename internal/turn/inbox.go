@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"tofu/internal/konst"
 	"tofu/internal/llm"
 	"tofu/internal/session"
 )
@@ -30,6 +31,7 @@ const (
 	sourceForkCarry     = "fork carry"
 	sourceCheck         = "sub-agent check"
 	sourceReport        = "sub-agent report"
+	sourceReportForLead = "sub-agent report needing the lead"
 	sourceMessage       = "message to this sub-agent"
 	sourceGateAsk       = "sub-agent gate ask"
 	sourceMemory        = "memory saved"
@@ -332,17 +334,63 @@ func (b *Inbox) takeItems() []inboxItem {
 	return taken
 }
 
+func gathers(item inboxItem) bool {
+	return item.source == sourceReport || item.source == sourceCheck
+}
+
+func (b *Inbox) takeAtOnce() []inboxItem {
+	taken := slices.DeleteFunc(slices.Clone(b.items), gathers)
+	b.items = slices.DeleteFunc(b.items, func(item inboxItem) bool { return !gathers(item) })
+	return taken
+}
+
+func (b *Inbox) fold(origin string) []inboxItem {
+	if origin == sourceGateAsk {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		return b.takeAtOnce()
+	}
+	return b.takeItems()
+}
+
+func (b *Inbox) due(now time.Time) (taken []inboxItem, done bool, closesIn time.Duration) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if slices.ContainsFunc(b.items, func(item inboxItem) bool { return !gathers(item) }) {
+		return b.takeAtOnce(), true, 0
+	}
+	var first, last time.Time
+	for _, item := range b.items {
+		if item.source == sourceReport {
+			first, last = cmp.Or(first, item.posted), item.posted
+		}
+	}
+	closesIn = min(last.Add(konst.ReportGatherQuietMillis*time.Millisecond).Sub(now), first.Add(konst.ReportGatherCapMillis*time.Millisecond).Sub(now))
+	switch {
+	case !first.IsZero() && (b.running == 0 || closesIn <= 0):
+		taken, b.items = b.items, nil
+		return taken, true, 0
+	case b.running+len(b.asked) == 0:
+		return nil, true, 0
+	case first.IsZero():
+		return nil, false, 0
+	}
+	return nil, false, closesIn
+}
+
 func (b *Inbox) next(ctx context.Context, typed <-chan string) ([]inboxItem, string) {
 	for {
-		b.mu.Lock()
-		taken, waiting := b.items, b.running+len(b.asked)
-		b.items = nil
-		b.mu.Unlock()
-		if len(taken) > 0 || waiting == 0 {
+		taken, done, closesIn := b.due(time.Now())
+		if done {
 			return taken, ""
+		}
+		var closed <-chan time.Time
+		if closesIn > 0 {
+			closed = time.After(closesIn)
 		}
 		select {
 		case <-b.wake:
+		case <-closed:
 		case said := <-typed:
 			return nil, said
 		case <-ctx.Done():
@@ -504,7 +552,7 @@ func (b *Inbox) withdraw(held *heldSubAgent, answer chan bool, asked string) boo
 	return true
 }
 
-func (b *Inbox) ended(held *heldSubAgent, report string, stopping bool, log *session.Log) []inboxItem {
+func (b *Inbox) ended(held *heldSubAgent, report, source string, stopping bool, log *session.Log) []inboxItem {
 	b.mu.Lock()
 	defer b.signal()
 	defer b.mu.Unlock()
@@ -514,7 +562,7 @@ func (b *Inbox) ended(held *heldSubAgent, report string, stopping bool, log *ses
 	held.running, held.check, held.allowedHere = false, nil, nil
 	b.running--
 	if report != "" {
-		b.items = append(b.items, inboxItem{text: report, source: sourceReport, posted: time.Now()})
+		b.items = append(b.items, inboxItem{text: report, source: source, posted: time.Now()})
 	}
 	if report != "" && log != nil {
 		if _, err := log.Append(session.Event{Agent: held.agent.ID, Kind: session.EventReport}, session.ReportBody{State: held.agent.State.String(), Text: report}); err != nil {

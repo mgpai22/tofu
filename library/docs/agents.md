@@ -28,6 +28,11 @@ and deletes with no ask. See [Scratchpad](scratchpad).
 A sub-agent from before a restart holds no paths until a message resumes
 it, so a new one can start on them. With `projectManagement` set to `boardy`, a spawn names a `ticket`:
 its owns become the paths, and the sub-agent moves it to review itself. See [Boardy](boardy).
+Clean reports finishing close together reach the model as one turn: each
+waits 1.5 seconds for the next, 10 at most, and goes at once when no
+sub-agent still runs. An ask, a report that is blocked, has concerns or needs
+context, and a report from a run the model resumed never wait. A check never
+starts a turn.
 
 A name is one plain lower-case word: letters, digits and `-`, starting
 with a letter, like `planner` or `ts-dev`.
@@ -61,12 +66,6 @@ with `--tools`:
 From anywhere else, name the project with `--dir`:
 
     tofu agents add --dir C:\code\shop planner --description "plans the work" --model claude-sub/claude-opus-5
-
-Set up three at once by running `add` three times, one model each:
-
-    tofu agents add planner --description "plans the work" --model claude-sub/claude-opus-5
-    tofu agents add coder --description "writes the code" --model claude-sub/claude-sonnet-5
-    tofu agents add checker --description "checks the result" --model codex-sub/gpt-5.6-sol
 
 Run a sub-agent on another model, including one tofu ships:
 

@@ -29,9 +29,10 @@ Each piece goes to a sub-agent with four things:
 # Sub-agents work in the background
 `spawn` returns at once. Sub-agents whose paths do not overlap run side by
 side. Each one gets its own conversation, its own model, and only the rules
-for its language and framework. Every 30 minutes the lead is sent a check on
+for its language and framework. Every 30 minutes tofu writes a check on
 each one still running: its steps, the files it changed, its gate, its last
 tool and its cost. tofu builds it from what it records, with no model call.
+A check never starts a lead turn on its own: it rides with the next one.
 
 # The gate holds them to their checks
 A language agent that changed a file in its language is sent back until its
@@ -76,9 +77,21 @@ its own words, or on one line per sub-agent saying what it is doing. It costs
 no request to announce the work. Sub-agents started in one reply are named in
 the order the reply lists them.
 
-The lead has one inbox. Your messages and finished
-reports both go into it. In the middle of a turn, the lead reads it at its
-next step. When idle, a new message or report starts a turn.
+The lead has one inbox. Your messages, finished reports, asks and checks
+all go into it. In the middle of a turn, the lead reads it at its next step.
+When idle, each kind wakes it differently:
+
+- **A message or an ask** starts a turn at once and never waits. An ask goes
+  alone, so the reports around it are not spent on a turn that only answers.
+- **A report that needs the lead** goes at once like an ask: one that ended
+  blocked, with concerns or needing context, and one from a run the lead
+  resumed with `message`.
+- **Other finished reports** wait 1.5 seconds for more, up to 10 seconds from
+  the first, and reach the lead as one turn. They go at once when no
+  sub-agent is still running, or when you type. On the `bench/fanin` cassettes, three
+  sub-agents finishing within a second and a half cost 1 lead turn instead
+  of 3.
+- **A check** never starts a turn; it rides with the next one.
 
 - **The lead to a sub-agent**: `message` adds work or corrects it. A
   finished sub-agent starts again with its conversation kept, from its

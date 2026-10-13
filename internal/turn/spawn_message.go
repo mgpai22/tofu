@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"tofu/internal/llm"
 	"tofu/internal/shell"
@@ -189,13 +190,13 @@ func (t *SpawnTool) send(ctx context.Context, to, text, from string) (Result, er
 		if opened.Close != nil {
 			opened.Close()
 		}
-		t.Inbox.ended(held, "", true, nil)
+		t.Inbox.ended(held, "", sourceReport, true, nil)
 		cancel()
 		return Result{}, fmt.Errorf("message refused: %w", err)
 	}
 	site, _ := ctx.Value(spawnSiteKey{}).(spawnSite)
 	t.Inbox.hold(held, site.log)
-	go t.background(runCtx, cancel, held, opened, site, text, nil)
+	go t.background(runCtx, cancel, held, opened, site, text, llm.Origin{Source: sourceMessage, PostedAt: time.Now()}, nil)
 	return Result{Content: to + " resumes in the background with its conversation. its report comes to you as a message when it ends.", Command: "message " + to, SubAgent: to}, nil
 }
 
