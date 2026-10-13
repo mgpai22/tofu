@@ -629,6 +629,64 @@ func (t *BashTool) Run(ctx context.Context, raw json.RawMessage) (Result, error)
 	return exitedResult(args.Command, text, cmd.ProcessState.ExitCode(), note), nil
 }
 
+func codeFlags(code subagent.InlineCode) []string {
+	if code.Python() {
+		return append([]string{"-I"}, slices.DeleteFunc(slices.Clone(code.Flags), func(flag string) bool { return flag == "-I" })...)
+	}
+	return code.Flags
+}
+
+type inlineCodeTool struct {
+	request GateRequest
+}
+
+func (inlineCodeTool) Name() string { return bashToolName }
+
+func (inlineCodeTool) Definition() llm.Tool { return llm.Tool{Name: bashToolName} }
+
+func (t inlineCodeTool) Run(ctx context.Context, _ json.RawMessage) (Result, error) {
+	code := *t.request.Code
+	extension := ".js"
+	if code.Python() {
+		extension = ".py"
+	}
+	snapshot := filepath.Join(code.Cwd, "code", CodeSum(code)+extension)
+	if err := sys.WriteFile(snapshot, []byte(code.Code), 0o600); err != nil {
+		return Result{}, fmt.Errorf("bash: the inline code was not copied to run: %w", err)
+	}
+	deadline := konst.BashDeadlineMillis * time.Millisecond
+	ctx, cancel := context.WithTimeout(ctx, deadline)
+	defer cancel()
+	argv := slices.Concat(codeFlags(code), []string{snapshot}, code.Args)
+	cmd := exec.CommandContext(ctx, code.Program, argv...)
+	tmp := filepath.Join(code.Cwd, "tmp")
+	cmd.Dir, cmd.WaitDelay = code.Cwd, konst.BashWaitDelayMillis*time.Millisecond
+	cmd.Env = shell.CodeEnv("TMPDIR="+tmp, "TMP="+tmp, "TEMP="+tmp, "PYTHONUNBUFFERED=1", "PYTHONDONTWRITEBYTECODE=1", "AI_AGENT=tofu")
+	output := &heldOutput{}
+	cmd.Stdout, cmd.Stderr = output, output
+	started := time.Now()
+	tracked, err := shell.StartTracked(cmd)
+	if err != nil {
+		return Result{}, fmt.Errorf("bash: %w", err)
+	}
+	defer tracked.Release()
+	runErr := cmd.Wait()
+	text, dropped := output.text()
+	command := strings.Join(append([]string{code.Program}, argv...), " ")
+	ran := "ran " + command + " in " + code.Cwd + " with environment " + shell.CodeEnvProfile + ", killed at " + deadline.String() + "\n" + dropped
+	var result Result
+	switch {
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+		result = deadlineResult(command, ran+text, deadline)
+	case cmd.ProcessState == nil:
+		return Result{}, fmt.Errorf("bash: %w", runErr)
+	default:
+		result = exitedResult(command, text, cmd.ProcessState.ExitCode(), ran)
+	}
+	CodeEntry{Turn: t.request.TurnID, Code: code, Answer: CodeRan, Exit: result.ExitCode, Took: time.Since(started)}.Record()
+	return result, nil
+}
+
 type heldOutput struct {
 	head, tail []byte
 	total      int

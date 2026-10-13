@@ -10,6 +10,7 @@ import (
 
 const (
 	notRead     = "bash runs only"
+	asksPerson  = "runs only once the person allows this exact code"
 	sourceShell = "is source: change it with edit or write"
 )
 
@@ -58,15 +59,15 @@ func TestWithNoOwnsBashRefusesEveryCommandThatWroteInRoundOne(t *testing.T) {
 		{"git branch gone", notRead},
 		{`powershell -NoProfile -Command "Set-Content -Path ps-set.txt -Value x"`, notRead},
 		{`cmd //c "echo x> cmd.txt"`, notRead},
-		{`python -c "open('py.txt','w').write('x')"`, notRead},
-		{"python - <<'EOF'\nopen('hdpy.txt','w').write('x')\nEOF", notRead},
+		{`python -c "open('py.txt','w').write('x')"`, asksPerson},
+		{"python - <<'EOF'\nopen('hdpy.txt','w').write('x')\nEOF", asksPerson},
 		{"python -m http.server", notRead},
 		{`bash -c 'echo x > bashc.txt'`, notRead},
 		{`sh -c 'echo x > shc.txt'`, notRead},
 		{`eval 'echo x > eval.txt'`, notRead},
 		{`awk '{print > "awk.txt"}' README.md`, notRead},
 		{`perl -e 'open(F, ">perl.txt")'`, notRead},
-		{`node -e "require('fs').writeFileSync('n.txt','x')"`, notRead},
+		{`node -e "require('fs').writeFileSync('n.txt','x')"`, asksPerson},
 		{"touch touched.txt", notOwned},
 		{"mkdir made", notOwned},
 		{"dd if=README.md of=dd.txt", notRead},

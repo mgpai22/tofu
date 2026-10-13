@@ -59,6 +59,9 @@ func Run(ctx context.Context, config Config) (Row, error) {
 	if config.ResultBytesCap <= 0 {
 		return Row{}, errors.New("turn: no tool result byte cap")
 	}
+	if config.SpawnedFrom == "" {
+		ctx = context.WithValue(ctx, leadPersonKey{}, config.Person)
+	}
 	if config.Spend != SpendSubscription && config.Spend != SpendAPIKey {
 		return Row{}, errors.New("turn: the row has to say which arm paid, subscription or api_key")
 	}
@@ -739,6 +742,13 @@ func Run(ctx context.Context, config Config) (Row, error) {
 				return endAt(OutcomeStopped, theTurnEndsOnACleanReport, messages), nil
 			}
 			pending, batches := decision.ToolCalls, 0
+			codes := map[string]Registry{}
+			toolsFor := func(gated gatedCall) Registry {
+				if code, asked := codes[gated.id]; asked {
+					return code
+				}
+				return stepTools
+			}
 			var tripped bool
 			var repeated ToolCallRow
 			var repeats int
@@ -756,10 +766,20 @@ func Run(ctx context.Context, config Config) (Row, error) {
 					}
 					request := GateRequest{TurnID: row.ID, Task: config.Task, Tool: call.Name, Args: call.Arguments, Call: call.ID}
 					gated := gatedCall{call: call, asked: asked, proxy: proxyRow, id: session.EventIDFor(origin, call.ID), parent: stepRow.id, author: author, sift: sifter, thrift: thrifter, redact: redactor, task: config.Task, site: recorded.site(call.ID, messages), model: model, fire: fire, hooks: hookRunOf(hook.PreToolUse, pre)}
-					if gated.refusal = boundaryRefusal(stepTools, call); gated.refusal == "" {
+					code, asksCode := codeAsked(stepTools, call)
+					if asksCode = asksCode && config.SpawnedFrom != ""; !asksCode {
+						gated.refusal = boundaryRefusal(stepTools, call)
+					}
+					if gated.refusal == "" {
 						gated.refusal = hookRefusal(ctx, config, request, pre)
 					}
-					if gated.refusal != "" {
+					if asksCode && gated.refusal == "" {
+						request.Code = &code
+						if gated.refusal = codeRefusal(ctx, config.Person, request); gated.refusal == "" {
+							codes[gated.id] = NewRegistry(inlineCodeTool{request: request})
+						}
+					}
+					if gated.refusal != "" || asksCode {
 						wave = append(wave, gated)
 						continue
 					}
@@ -816,7 +836,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 				answers := make([]llm.Message, len(wave))
 				memoHits := make([]bool, len(wave))
 				if len(wave) == 1 {
-					rows[0], answers[0], memoHits[0] = wave[0].run(withShellCall(ctx, wave[0].id), stepTools, config.ResultBytesCap, artifacts, 0)
+					rows[0], answers[0], memoHits[0] = wave[0].run(withShellCall(ctx, wave[0].id), toolsFor(wave[0]), config.ResultBytesCap, artifacts, 0)
 				} else {
 					batches++
 					var running sync.WaitGroup
@@ -824,7 +844,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 					for i, gated := range wave {
 						go func() {
 							defer running.Done()
-							rows[i], answers[i], memoHits[i] = gated.run(withShellCall(ctx, gated.id), stepTools, config.ResultBytesCap, artifacts, batches)
+							rows[i], answers[i], memoHits[i] = gated.run(withShellCall(ctx, gated.id), toolsFor(gated), config.ResultBytesCap, artifacts, batches)
 						}()
 					}
 					running.Wait()

@@ -47,6 +47,28 @@ func (c Choice) Command(ctx context.Context, dir, command string, extraEnv ...st
 	return cmd
 }
 
+const CodeEnvProfile = "allowlist@1"
+
+func CodeEnv(extra ...string) []string {
+	kept := []string{}
+	for _, entry := range os.Environ() {
+		name, _, _ := strings.Cut(entry, "=")
+		upper := strings.ToUpper(name)
+		safe := slices.ContainsFunc([]string{"PATH", "HOME", "USER", "LANG", "LC_", "TERM", "SHELL", "LOGNAME", "XDG_", "VIRTUAL_ENV", "CONDA"}, func(prefix string) bool {
+			return strings.HasPrefix(upper, prefix)
+		}) || runtime.GOOS == "windows" && slices.Contains([]string{"SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "OS", "PROCESSOR_ARCHITECTURE",
+			"NUMBER_OF_PROCESSORS", "PUBLIC", "ALLUSERSPROFILE", "PROGRAMDATA", "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "APPDATA",
+			"LOCALAPPDATA", "HOMEDRIVE", "COMPUTERNAME"}, upper)
+		secret := slices.ContainsFunc([]string{"KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL", "AUTH"}, func(word string) bool {
+			return strings.Contains(upper, word)
+		}) || slices.ContainsFunc(sys.KeyNames(), func(key string) bool { return strings.EqualFold(name, key) })
+		if safe && !secret {
+			kept = append(kept, entry)
+		}
+	}
+	return append(kept, extra...)
+}
+
 const posixSyntaxDoesNotApply = "this project's tools assume a posix shell: heredocs, $VAR, forward slashes and /dev/null do not work here, " +
 	"and && and || are a parse error in Windows PowerShell 5.1"
 

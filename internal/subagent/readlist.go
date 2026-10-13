@@ -1,6 +1,7 @@
 package subagent
 
 import (
+	"os"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -31,11 +32,120 @@ func (e ReadListError) Error() string {
 	return e.Program + " " + e.Why + ". Outside the paths you hold, bash runs only commands that read, list, search or inspect, or run the project's own checks: a file you hold changes with write or edit, and anything else goes in your report"
 }
 
+type InlineCode struct {
+	Program string
+	Flags   []string
+	Script  string
+	Code    string
+	Args    []string
+	Cwd     string
+}
+
+func (c InlineCode) Python() bool {
+	return pythonName(toolName(c.Program))
+}
+
+func pythonName(program string) bool {
+	return program == "py" || strings.HasPrefix(program, "python") && strings.Trim(program[len("python"):], "0123456789.") == ""
+}
+
+type CodeAskError struct {
+	Code InlineCode
+}
+
+func (e CodeAskError) Error() string {
+	return e.Code.Program + " runs inline code, which runs only once the person allows this exact code through the orchestrator"
+}
+
+const codeAskWhy = "is on the read list only as python -m pytest, mypy, ruff or unittest, or as inline code the person allows: one call with -c or -e in single quotes, a heredoc, or a script in your scratch folder, with nothing piped or chained"
+
+func (b *Boundary) inlineCode(command string) (InlineCode, bool) {
+	if b.Scratch == "" {
+		return InlineCode{}, false
+	}
+	lexer := shellLexer{src: command, known: b.temp()}
+	var words []shellWord
+	for {
+		token, word, more := lexer.next()
+		switch {
+		case len(lexer.heredocs) > 0:
+			stdin, closed := heredocBody(command[lexer.at:], lexer.heredocs)
+			if !closed {
+				return InlineCode{}, false
+			}
+			return b.codeCall(words, stdin, true)
+		case !more, token == tokenBreak && word.text == "\n" && strings.TrimSpace(command[lexer.at:]) == "":
+			return b.codeCall(words, "", false)
+		case token == tokenWord:
+			words = append(words, word)
+		case token != tokenNothing:
+			return InlineCode{}, false
+		}
+	}
+}
+
+func heredocBody(rest string, docs []heredoc) (string, bool) {
+	line, body, found := strings.Cut(rest, "\n")
+	if len(docs) != 1 || !found || strings.TrimSpace(line) != "" {
+		return "", false
+	}
+	lines := strings.Split(body, "\n")
+	for i, text := range lines {
+		if docs[0].tabs {
+			lines[i] = strings.TrimLeft(text, "\t")
+		}
+		if strings.TrimSuffix(lines[i], "\r") == docs[0].delimiter {
+			return strings.Join(lines[:i], "\n") + "\n", strings.TrimSpace(strings.Join(lines[i+1:], "\n")) == ""
+		}
+	}
+	return "", false
+}
+
+func (b *Boundary) codeCall(words []shellWord, stdin string, fed bool) (InlineCode, bool) {
+	if len(words) == 0 || bare(words[0]) != nil || slices.ContainsFunc(words, func(word shellWord) bool { return word.expands }) {
+		return InlineCode{}, false
+	}
+	flags, codeFlags := []string{"-u", "-B", "-I", "-E", "-s", "-S", "-P", "-O", "-OO", "-q", "-b", "-bb"}, []string{"-c"}
+	switch program := toolName(words[0].text); {
+	case program == "node":
+		flags, codeFlags = []string{"--no-warnings"}, []string{"-e", "--eval"}
+	case !pythonName(program):
+		return InlineCode{}, false
+	}
+	code, rest := InlineCode{Program: words[0].text, Cwd: b.Scratch}, make([]string, 0, len(words)-1)
+	for _, word := range words[1:] {
+		rest = append(rest, word.text)
+	}
+	for len(rest) > 0 && slices.Contains(flags, rest[0]) {
+		code.Flags, rest = append(code.Flags, rest[0]), rest[1:]
+	}
+	switch {
+	case fed && (len(rest) == 0 || rest[0] == "-"):
+		code.Code, code.Args = stdin, rest[min(1, len(rest)):]
+	case fed:
+		return InlineCode{}, false
+	case len(rest) > 1 && slices.Contains(codeFlags, rest[0]):
+		code.Code, code.Args = rest[1], rest[2:]
+	case len(rest) > 0 && !strings.HasPrefix(rest[0], "-") && b.Scratched(rest[0]):
+		body, err := os.ReadFile(rest[0])
+		if err != nil {
+			return InlineCode{}, false
+		}
+		code.Script, code.Code, code.Args = rest[0], string(body), rest[1:]
+	default:
+		return InlineCode{}, false
+	}
+	return code, true
+}
+
 func (b *Boundary) HoldsTheTree() bool {
 	return slices.Contains(b.Owns(), "**")
 }
 
 func (b *Boundary) Bash(command string, grammar Grammar) error {
+	if code, found := b.inlineCode(command); found {
+		return CodeAskError{Code: code}
+	}
 	if b.HoldsTheTree() {
 		return b.Shell(command)
 	}
@@ -204,9 +314,11 @@ func (g Grammar) readOnly(tool string, args []shellWord) (bool, error) {
 		return g.wrapped(tool, args)
 	case "python", "python3", "py":
 		if first(args) != "-m" || !slices.Contains([]string{"pytest", "mypy", "ruff", "unittest"}, first(args[1:])) {
-			return true, ReadListError{Program: tool, Why: "runs here only as -m pytest, mypy, ruff or unittest, never inline code or a script"}
+			return true, ReadListError{Program: tool, Why: codeAskWhy}
 		}
 		return g.wrapped(tool, args[1:])
+	case "node":
+		return true, ReadListError{Program: tool, Why: codeAskWhy}
 	case "npx", "pnpx", "bunx":
 		if !slices.Contains([]string{"tsc", "vue-tsc", "svelte-check", "vitest", "jest", "eslint", "prettier"}, first(args)) {
 			return true, ReadListError{Program: tool, Why: "runs here only a type checker, test runner or linter"}

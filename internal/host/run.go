@@ -356,14 +356,19 @@ func awaitPerson(emit func(Event), book *asks) turn.Person {
 		case overriding.Question != "":
 			emit(Event{Kind: EventNote, Text: overriding.Question})
 			emit(Event{Kind: EventDecision, ID: id, Decision: &Decision{Tool: request.Tool, Verdict: Ask, OverridesRule: overriding.Rule}})
+		case stands && request.Code != nil:
+			turn.CodeEntry{Turn: request.TurnID, Code: *request.Code, By: "the person, standing", Answer: codeAnswer(stood)}.Record()
+			return personAnswer(stood), nil
 		case stands:
 			recordStanding(request, place, stood)
-			if stood == AlwaysHere {
-				return turn.PersonAlwaysHere, nil
-			}
-			return turn.PersonDenied, nil
+			return personAnswer(stood), nil
+		case turn.StandingOnly(ctx):
+			return turn.PersonDenied, turn.NotStanding{}
 		}
 		asked := Event{Kind: EventAwaitPerson, ID: id, Tool: request.Tool, Text: place, Args: request.Args, Agent: turn.SubAgentAsking(ctx), Accepts: accepts}
+		if request.Code != nil {
+			emit(Event{Kind: EventNote, Text: asked.Agent + " asks you to run this inline code:\n" + turn.CodeShown(*request.Code)})
+		}
 		if decision.Verdict != ledger.VerdictUnset {
 			judged := gateDecision(request.Tool, decision)
 			asked.Decision = &judged
@@ -372,25 +377,45 @@ func awaitPerson(emit func(Event), book *asks) turn.Person {
 		defer forget()
 		emit(asked)
 		defer emit(Event{Kind: EventResumed, ID: asked.ID, Agent: asked.Agent})
+		started := time.Now()
 		select {
 		case answered := <-reply:
-			var out turn.PersonAnswer
-			switch answered {
-			case AlwaysHere:
-				out = turn.PersonAlwaysHere
-			case AllowedOnce:
-				out = turn.PersonAllowedOnce
-			case Denied, NeverHere:
-				out = turn.PersonDenied
-			default:
-				panic("host: unknown answer from the person")
+			if request.Code != nil {
+				turn.CodeEntry{Turn: request.TurnID, Code: *request.Code, By: "the person", Answer: codeAnswer(answered), Took: time.Since(started)}.Record()
 			}
+			out := personAnswer(answered)
 			recordPersonAnswer(decision.ID, out)
 			return out, nil
 		case <-ctx.Done():
 			return turn.PersonDenied, ctx.Err()
 		}
 	}
+}
+
+func personAnswer(answered Answer) turn.PersonAnswer {
+	switch answered {
+	case AlwaysHere:
+		return turn.PersonAlwaysHere
+	case AllowedOnce:
+		return turn.PersonAllowedOnce
+	case Denied, NeverHere:
+		return turn.PersonDenied
+	}
+	panic("host: unknown answer from the person")
+}
+
+func codeAnswer(answered Answer) turn.CodeAnswer {
+	switch answered {
+	case AlwaysHere:
+		return turn.CodeAllowAlways
+	case AllowedOnce:
+		return turn.CodeAllowOnce
+	case Denied:
+		return turn.CodeDeny
+	case NeverHere:
+		return turn.CodeDenyAlways
+	}
+	panic("host: unknown answer from the person")
 }
 
 func recordPersonAnswer(id string, answer turn.PersonAnswer) {

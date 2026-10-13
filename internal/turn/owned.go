@@ -79,7 +79,8 @@ func (t ownedShell) Name() string { return t.tool.Name() }
 func (t ownedShell) Definition() llm.Tool {
 	definition := t.tool.Definition()
 	if t.boundary.HoldsTheTree() {
-		definition.Description += ", and you hold the whole tree, so a command may write anywhere in it. A source file still changes with edit or write, never through a redirect, tee, cp, mv or sed -i, and a tree-wide check is the orchestrator's."
+		definition.Description += ", and you hold the whole tree, so a command may write anywhere in it. A source file still changes with edit or write, never through a redirect, tee, cp, mv or sed -i, and a tree-wide check is the orchestrator's. " +
+			"One python or node call with -c or -e, a heredoc, or a script in your scratch folder is inline code: it asks the person, and runs only if the person allows it."
 		return definition
 	}
 	definition.Description += ", and you hold only part of this project or none of it, so a command runs only when every step reads, lists, searches or inspects " +
@@ -87,7 +88,9 @@ func (t ownedShell) Definition() llm.Tool {
 		"or runs the project's own checks (go vet and go test, cargo test, check and clippy, npm, pnpm, yarn or bun test or a test, check, lint, typecheck or vet script, " +
 		"make targets named the same way, pytest, mypy, ruff check, and rtk or uv run around any of these). " +
 		"A redirect, tee, cp, mv, rm, mkdir, touch or sed -i lands only inside the paths your first message says you hold or your scratch folder, which $TMPDIR names; the system temp folder is refused, and a source file changes with edit or write. " +
-		"An interpreter (python -c, node -e, bash -c, powershell -Command, eval), a variable set before a command, $(...) or backticks, a program named by its path, and anything not listed are refused before they run, with the reason: put that work in your report."
+		"Inline code asks the person: one python or node call with -c or -e in single quotes, a heredoc (python - <<'EOF'), or a script in your scratch folder ($TMPDIR/x.py), with nothing piped or chained. " +
+		"The orchestrator may refuse it, only the person may allow it, and it runs with cwd in your scratch folder and no secret names in its environment. " +
+		"Any other interpreter call (bash -c, powershell -Command, eval), a variable set before a command, $(...) or backticks, a program named by its path, and anything not listed are refused before they run, with the reason: put that work in your report."
 	return definition
 }
 

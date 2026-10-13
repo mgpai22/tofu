@@ -55,6 +55,7 @@ func (messageTool) Definition() llm.Tool {
 			"so use it rather than spawning a new sub-agent for those paths. either way its answer comes to you later as a report, as spawn's does. " +
 			"to is the sub-agent's name as its report gives it, such as ts-dev-1. " +
 			"answer allow or deny answers a sub-agent's call that waits on you because the gate asked; any text goes to the sub-agent with it. " +
+			"on a sub-agent's inline code, deny refuses it and allow passes it to the person, who sees the exact code and decides. " +
 			"allow_here allows it and every later call of the same kind from that sub-agent until its run ends, so it does not ask you again; a revoke or replace of its paths ends that too. " +
 			"a turn that only answers asks ends after the message calls, with nothing to write. " +
 			"do acts on the sub-agent instead of sending text. stop: a running one ends after the call it is in, keeping its paths and its conversation; one that is not running is released. " +

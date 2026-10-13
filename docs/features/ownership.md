@@ -2,7 +2,7 @@
 title: Ownership
 description: Every sub-agent holds the paths it may write, tofu checks every write against them, and sub-agents with different paths run side by side.
 order: 4
-updated: 2026-10-09
+updated: 2026-10-13
 ---
 
 Every sub-agent that can write holds a list of paths, its `owns`: a file, a
@@ -15,9 +15,9 @@ folder, or a glob such as `internal/turn/*.go`. The lead gives it in the
 - A `bash` command is read before it runs, step by step. Outside `owns` it
   runs only when every step reads: reading, listing, searching, inspecting,
   `git` reads, and the project's own checks such as `go test`, `cargo
-  test` or `npm test`. `rm`, `mv`, a redirect, `sed -i`, `python -c`, `bash
-  -c`, PowerShell's `Set-Content` and anything the check can't read are
-  refused with the reason. A write into the agent's own scratch folder is
+  test` or `npm test`. `rm`, `mv`, a redirect, `sed -i`, `bash -c`,
+  PowerShell's `Set-Content` and anything the check can't read are refused
+  with the reason. A write into the agent's own scratch folder is
   allowed, and `TMP`, `TEMP` and `TMPDIR` point there; the system's
   temporary folder is not.
   The same check runs on Git Bash, PowerShell, Linux and macOS.
@@ -25,6 +25,32 @@ folder, or a glob such as `internal/turn/*.go`. The lead gives it in the
   `write`, never the shell.
 - Commands over the whole tree, such as `go test ./...`, are refused; they
   are the lead's to run once, after the sub-agents finish.
+
+## Inline code asks you
+
+A sub-agent's inline code runs only when you allow it. Inline code is one
+`python` or `node` call with `-c` or `-e`, a heredoc such as
+`python - <<'EOF'`, or a script in the agent's scratch folder, with nothing
+piped or chained.
+
+1. The lead sees the code and may refuse it. It can't allow it; its allow
+   passes the code on to you.
+2. You see the exact code with hidden and bidirectional characters escaped,
+   its sha256, the interpreter and flags, the folder it runs in, and a line
+   saying network and file reads stay open, because no sandbox holds it.
+3. You answer allow once, deny, always here or never here. Always here
+   covers that exact code, from that agent, until tofu closes. Never here
+   is kept, and the same code is refused again without asking anyone.
+
+Allowed code runs from a copy of the bytes you saw, in the agent's scratch
+folder, with `python -I` for Python. Its environment keeps only an allowlist,
+and any name holding `KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `CREDENTIAL` or
+`AUTH` is left out. It's killed after 2 minutes and never moves to the
+background. Each ask and each run writes an `inline_code` row to the decision
+ledger, with the code, its sha256, who answered, the answer, the exit code and
+the duration.
+
+## Running side by side
 
 Two running sub-agents never hold overlapping paths. A spawn that would is
 refused and told to `message` the holder instead. After a restart, the
