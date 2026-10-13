@@ -3,6 +3,7 @@ package rule
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -139,6 +140,67 @@ func TestEveryFrameworkAndTheMetaFrameworksThatImplyOneAreDetected(t *testing.T)
 	both, err := Frameworks(project(t, map[string]string{"package.json": `{"dependencies": {"next": "15", "react": "19"}}`}), nil)
 	if err != nil || len(both) != 1 || both[0] != "react" {
 		t.Errorf("next and react together read %v, %v, want [react] once", both, err)
+	}
+}
+
+func TestACargoManifestNamesGpuiCeOnlyWhereADependencyTableDependsOnIt(t *testing.T) {
+	for body, want := range map[string]bool{
+		"[dependencies]\ngpui-ce = \"0.2\"\n":                                                  true,
+		"[dependencies]\ngpui = { package = \"gpui-ce\", path = \"vendor/gpui\" }\n":           true,
+		"[workspace.dependencies]\ngpui = { package = \"gpui-ce\", path = \"vendor/gpui\" }\n": true,
+		"[dependencies.gpui]\npackage = \"gpui-ce\"\npath = \"vendor/gpui\"\n":                 true,
+		"[dependencies.gpui-ce]\nversion = \"0.2\"\n":                                          true,
+		"[target.'cfg(target_os = \"windows\")'.dependencies]\ngpui-ce = \"0.2\"\n":            true,
+		"[dev-dependencies]\n\"gpui-ce\" = \"0.2\"\n":                                          true,
+		"[dependencies.gpui]\nversion = \"0.2\"\n[dependencies.ui]\npackage = \"gpui-ce\"\n":   true,
+		"[dependencies]\ngpui = \"0.2\"\n":                                                     false,
+		"[dependencies.gpui]\nversion = \"0.2\"\n":                                             false,
+		"[dependencies]\ngpui_platform = { package = \"gpui_ce_platform\", path = \"x\" }\n":   false,
+		"[dependencies]\n# gpui-ce = \"0.2\"\n":                                                false,
+		"[features]\ntest = [\"gpui-ce/test-support\"]\n":                                      false,
+		"[patch.crates-io]\ngpui-ce = { path = \"x\" }\n":                                      false,
+		"[package]\nname = \"gpui-ce\"\n":                                                      false,
+	} {
+		frameworks, err := Frameworks(project(t, map[string]string{"Cargo.toml": body}), nil)
+		if err != nil || slices.Contains(frameworks, "gpui-ce") != want {
+			t.Errorf("Cargo.toml %q reads %v, %v, want gpui-ce %v", body, frameworks, err, want)
+		}
+	}
+}
+
+func TestAWorkspaceMemberReachesGpuiCeThroughTheWorkspaceManifestAboveIt(t *testing.T) {
+	root := project(t, map[string]string{
+		"apps/desk/Cargo.toml":           "[workspace]\nmembers = [\"crates/ui\"]\n\n[workspace.dependencies]\ngpui = { package = \"gpui-ce\", path = \"vendor/gpui-ce/crates/gpui\" }\n",
+		"apps/desk/crates/ui/Cargo.toml": "[package]\nname = \"desk_ui\"\n\n[dependencies]\ngpui.workspace = true\n",
+		"apps/web/package.json":          `{"dependencies": {"react": "19"}}`,
+	})
+	gpui := frameworkRule(t, "gpui-ce")
+	for _, c := range []struct {
+		paths []string
+		want  []string
+	}{
+		{[]string{"apps/desk/crates/ui/src/components/tabs.rs"}, []string{"gpui-ce"}},
+		{[]string{"apps/desk/crates/ui/**"}, []string{"gpui-ce"}},
+		{[]string{"apps/desk/crates/ui/src/tabs.rs", "apps/web/src/App.tsx"}, []string{"gpui-ce", "react"}},
+		{[]string{"internal/rule/framework.go"}, nil},
+		{nil, nil},
+	} {
+		frameworks, err := Frameworks(root, c.paths)
+		if err != nil || !slices.Equal(frameworks, c.want) {
+			t.Errorf("paths %v read %v, %v, want %v", c.paths, frameworks, err, c.want)
+			continue
+		}
+		if fires, why := gpui.Trigger.firesFor(Task{Paths: c.paths, Frameworks: frameworks}); fires != slices.Contains(c.want, "gpui-ce") {
+			t.Errorf("framework: gpui-ce for %v: fires = %v: %s", c.paths, fires, why)
+		}
+	}
+}
+
+func TestACargoManifestAboveTheProjectRootIsNotRead(t *testing.T) {
+	root := project(t, map[string]string{"../Cargo.toml": "[dependencies]\ngpui-ce = \"0.2\"\n", "src/main.rs": "fn main() {}"})
+	frameworks, err := Frameworks(root, []string{"src/main.rs"})
+	if err != nil || len(frameworks) != 0 {
+		t.Fatalf("Frameworks = %v, %v, want none: the gpui-ce Cargo.toml sits above the project", frameworks, err)
 	}
 }
 

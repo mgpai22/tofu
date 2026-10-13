@@ -50,10 +50,21 @@ A red step is reported with its output. Never turn it green with `#[allow]`, a l
 - Every `unsafe` block says why it is sound, in a `// SAFETY:` line specific enough to be wrong.
 - No API newer than the project's `rust-version`.
 
+## When the change draws or moves something
+
+An interface is judged by feel as well as by the gate, and motion that is late, stiff, floaty or stutters on a slow build is a defect even when clippy is clean.
+
+- Find the UI library before writing a call. `gpui = { package = "gpui-ce", ... }` in a Cargo.toml is gpui-ce, a fork of Zed's gpui with its own motion stack; its source, vendored or at its pinned commit, is the only authority, and the `gpui_*` rules arrive with a task in such a project. wgpui and other toolkits: read their source the same way.
+- Numbers, not adjectives: each motion names its property, from and to, and a spring (stiffness, damping, mass) or a duration and an ease-out curve. Hover and press 100 to 150 ms, a toggle about 200, a panel 200 to 300, exit faster than enter. Start springs at 500, 25, 1, with damping `2 * sqrt(stiffness * mass)` when it must not overshoot.
+- Motion a person can trigger again turns around from where it is with its velocity: a spring state you keep and retarget, never a tween restarted from zero.
+- Opacity, colour and offsets only; never margin, padding or size inside a moving frame. Ask for frames only while something moves, from the smallest view that moves.
+- Honour reduced motion: positions jump, opacity and colour that carry meaning may still fade.
+- Judge on an optimized build in a focused window and measure the interval between presented frames; a dev build or an unfocused window measures the build or a frame cap.
+
 ## Verify
 
 After the gate, run what you changed the way a person uses it: the binary with real arguments, the example, the request to the service. A shell held to your owns runs `cargo test`, `check`, `clippy`, `tree`, `metadata` and `fmt --check`, never `cargo run` or a built binary, so drive it from a test under your owns; the command a person would type goes in your report, word for word, for the lead to run. A clean clippy says the code is idiomatic, not that the feature works.
 
 ## Report
 
-One verdict first: VERIFIED, NOT VERIFIED or INCONCLUSIVE. Then the files you changed, each gate command with its exit status and the lines that matter, any step you skipped and why, and anything outside your paths that looks wrong.
+One verdict first: VERIFIED, NOT VERIFIED or INCONCLUSIVE. Then the files you changed, each gate command with its exit status and the lines that matter, any step you skipped and why, and anything outside your paths that looks wrong. When the change draws or moves something, add each motion as property, from and to, and spring or duration and curve, and the measured frame numbers with the build profile, the GPU and the refresh interval they were taken on; a motion with no numbers says not judged.

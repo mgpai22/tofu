@@ -10,7 +10,8 @@ verbs: agents
 A sub-agent is a helper the model can hand one piece of a task to, like a
 planner or a reviewer. Each one has a name, a description the model reads
 to decide when to use it, the model it runs on, and the tools it may use.
-tofu ships a few, and you can add your own.
+tofu ships a few, and you can add your own. `rust-dev` also builds gpui-ce
+interfaces, with the `gpui_` rules when a Cargo.toml depends on gpui-ce.
 
 When the model hands one a piece of work, it names the paths that
 sub-agent may change. A sub-agent given no paths still starts: it reads,

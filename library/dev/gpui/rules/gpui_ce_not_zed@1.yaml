@@ -1,0 +1,7 @@
+id: gpui_ce_not_zed
+domain: dev
+kind: human
+concern: code_rules
+framework: gpui-ce
+text: this project builds on gpui-ce, a community fork of Zed's gpui, usually renamed in Cargo.toml as `gpui = { package = "gpui-ce", ... }`. the two are different libraries: an API, a signature or an example from Zed's gpui, docs.rs `gpui` or the zed repository is a lead until the same thing is found in gpui-ce's source, which is the copy the project builds, vendored or from its pinned commit. search it before writing a call: `grep -rn "pub fn <name>"` under `crates/gpui/src`. gpui-ce has its own motion stack (`spring.rs`, `motion.rs`, `animated.rs`, `transition.rs`, style transitions) and no scale or rotate on a `div`; only an `svg` takes a `Transformation`. it has no releases, so a fact read from its source carries the commit it was read at. fix in the project's own crates before patching the vendored tree.
+notes: gpui-ce and Zed's gpui share names and drift apart, so an agent writing from memory of Zed's gpui calls APIs that do not exist or behave differently. it guards against invented signatures, Zed-only APIs and undocumented vendor patches.
