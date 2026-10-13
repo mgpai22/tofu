@@ -8,7 +8,6 @@ import (
 	"io"
 	"maps"
 	"net"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -385,10 +384,8 @@ func (r *relay) handle(s *session, req request) {
 func (r *relay) admit(s *session, req request) (status, error) {
 	switch req.Op {
 	case opOpen, opNavigate:
-		var args openArgs
-		_ = json.Unmarshal(req.Args, &args)
-		if parsed, err := url.Parse(args.URL); err != nil || !slices.Contains([]string{"http", "https", "file"}, parsed.Scheme) {
-			return "", fmt.Errorf("tofu opens only http, https and file URLs, not %q", args.URL)
+		if _, err := openable(req.Args); err != nil {
+			return "", err
 		}
 		if req.Op == opNavigate && !r.tabs[req.Tab].Opened {
 			return "", fmt.Errorf("tab %d is the person's: tofu navigates only tabs it opened", req.Tab)

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -140,6 +141,15 @@ const (
 
 type openArgs struct {
 	URL string `json:"url"`
+}
+
+func openable(raw json.RawMessage) (string, error) {
+	var args openArgs
+	_ = json.Unmarshal(raw, &args)
+	if parsed, err := url.Parse(args.URL); err != nil || !slices.Contains([]string{"http", "https", "file"}, parsed.Scheme) {
+		return "", fmt.Errorf("tofu opens only http, https and file URLs, not %q", args.URL)
+	}
+	return args.URL, nil
 }
 
 func opStatus(req request) (status, error) {

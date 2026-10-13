@@ -23,6 +23,7 @@ import (
 	"tofu/internal/browser/motion"
 	"tofu/internal/konst"
 	"tofu/internal/recipe"
+	settingspkg "tofu/internal/settings"
 	"tofu/internal/sys"
 	"tofu/internal/turn/tools"
 	"tofu/internal/widget"
@@ -87,7 +88,10 @@ func browserVerb(args []string, out, errOut io.Writer) int {
 	if err == nil && tabErr == nil && verb == "motion" {
 		return o.motion(tab, operands)
 	}
-	arity, known := map[string][2]int{"": {0, 0}, "tabs": {0, 0}, "build": {0, 0}, "install": {0, 0}, "uninstall": {0, 0}, "open": {1, 1}, "close": {1, 1},
+	if err == nil && verb == "profile" {
+		return o.profile(operands)
+	}
+	arity, known := map[string][2]int{"": {0, 0}, "tabs": {0, 0}, "build": {0, 0}, "install": {0, 0}, "uninstall": {0, 0}, "open": {1, 1}, "close": {1, 1}, "read": {0, 0},
 		"recipes": {0, 0}, "observe": {0, 0}, "click": {1, 1}, "fill": {2, 2}, "select": {2, 2}, "press": {1, 1}, "scroll": {0, 2}, "back": {0, 0}, "batch": {0, 1}}[verb]
 	stepVerb := slices.Contains([]string{"observe", "click", "fill", "select", "press", "scroll", "back"}, verb)
 	operand := strings.Join(operands, " ")
@@ -95,7 +99,9 @@ func browserVerb(args []string, out, errOut io.Writer) int {
 	if err != nil || tabErr != nil || known && (len(operands) < arity[0] || len(operands) > arity[1]) || verb == "close" && badID != nil || stepVerb && tab == 0 {
 		_, _ = fmt.Fprintln(errOut, "usage: tofu browser [install | uninstall | tabs | build | recipes | open <url> | close <tab id> | bench [--jev] [--n 12] [--rows file] | motion capture <scenario.json>] [--json]\n"+
 			"       tofu browser observe [--all] | click <ref> | fill <ref> <text> | select <ref> <option> | press <key> | scroll [<ref>] [up|down] | back   --tab <id> [--json]\n"+
-			"       tofu browser batch [<steps.json> | -] [--tab <id>] [--json]")
+			"       tofu browser read [--tab <id>] [--json]\n"+
+			"       tofu browser batch [<steps.json> | -] [--tab <id>] [--json]\n"+
+			"       "+profileUsage)
 		return exitUsage
 	}
 	home, err := os.UserHomeDir()
@@ -154,6 +160,16 @@ func browserVerb(args []string, out, errOut io.Writer) int {
 			Tab int    `json:"tab"`
 			URL string `json:"url"`
 		}{tab, operand}, []string{page.Receipt(cli.Added, "opened tab "+strconv.Itoa(tab), operand)})
+	case "read":
+		var tabs []browser.Tab
+		if err := o.withBrowser(home, func(client *browser.Client) (err error) { tabs, err = client.Tabs(); return err }); err != nil {
+			return o.fail(err)
+		}
+		read, err := tabToRead(tabs, tab)
+		if err != nil {
+			return o.fail(err)
+		}
+		return o.show(read, page.Title(read.Title, []string{"tab " + strconv.Itoa(read.ID), read.URL}, cli.Verdict{Mark: cli.Done, Text: "read"}))
 	case "close":
 		if err := o.withBrowser(home, func(client *browser.Client) error { return client.CloseTab(tabID) }); err != nil {
 			return o.fail(err)
@@ -182,7 +198,7 @@ func browserVerb(args []string, out, errOut io.Writer) int {
 		removed.Manifests = manifests
 		return o.show(removed, extensionPage(page, removed))
 	}
-	_, _ = fmt.Fprintf(errOut, "tofu browser: unknown argument %q: use install, uninstall, tabs, build, recipes, open, close, observe, click, fill, select, press, scroll, back, batch, bench, motion, or nothing\n", verb)
+	_, _ = fmt.Fprintf(errOut, "tofu browser: unknown argument %q: use install, uninstall, tabs, build, recipes, open, read, close, observe, click, fill, select, press, scroll, back, batch, bench, motion, profile, or nothing\n", verb)
 	return exitUsage
 }
 
@@ -197,7 +213,7 @@ func (o browserOutput) batch(home string, tab int, from string) int {
 	tabs := tools.NewBrowserTabs(home)
 	report, failed := "", 0
 	if err == nil {
-		report, failed, err = tools.BrowserBatch(context.Background(), home, tabs, tab, steps)
+		report, failed, err = tools.BrowserBatch(context.Background(), browserEndpoint(home), tabs, tab, steps)
 	}
 	if tab == 0 {
 		tabs.Close()
@@ -386,15 +402,38 @@ func (o browserOutput) motion(tab int, args []string) int {
 	}{root, summary}, lines)
 }
 
+func browserEndpoint(home string) browser.Endpoint {
+	return browser.Endpoint{Home: home, Profile: settingText(".", settingspkg.BrowserProfile, nil), Headless: settingInt(".", settingspkg.BrowserHeadless, nil) != 0}
+}
+
+func tabToRead(tabs []browser.Tab, tab int) (browser.Tab, error) {
+	if tab != 0 {
+		if at := slices.IndexFunc(tabs, func(each browser.Tab) bool { return each.ID == tab }); at >= 0 {
+			return tabs[at], nil
+		}
+		return browser.Tab{}, fmt.Errorf("there is no tab %d: tofu browser tabs lists them", tab)
+	}
+	opened := slices.DeleteFunc(slices.Clone(tabs), func(each browser.Tab) bool { return !each.Opened })
+	if len(opened) == 1 {
+		return opened[0], nil
+	}
+	ids := make([]string, len(opened))
+	for i, each := range opened {
+		ids[i] = strconv.Itoa(each.ID)
+	}
+	return browser.Tab{}, fmt.Errorf("tofu opened %d tabs (%s): name one with --tab", len(opened), strings.Join(ids, ", "))
+}
+
 func (o browserOutput) withBrowser(home string, use func(*browser.Client) error) error {
-	client, err := browser.Dial(home)
+	at := browserEndpoint(home)
+	client, err := at.Dial()
 	if errors.Is(err, browser.ErrRelayRestarting) && !o.asJSON {
 		_, _ = fmt.Fprintln(o.out, o.page.Glyph(cli.Changed)+" updating: the relay restarts on this build")
 	}
 	restarting := errors.Is(err, browser.ErrRelayRestarting)
 	for until := time.Now().Add(konst.BrowserCallTimeoutMillis * time.Millisecond); restarting && err != nil && time.Now().Before(until); {
 		time.Sleep(konst.BrowserDialTimeoutMillis * time.Millisecond)
-		client, err = browser.Dial(home)
+		client, err = at.Dial()
 	}
 	if err != nil {
 		return err

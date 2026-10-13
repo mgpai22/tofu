@@ -667,6 +667,24 @@ exit 0
         "label": "Browser cursor",
         "description": "a small cursor labelled tofu glides to each click in tofu's own tab, so you can see where it acts; it is drawn only, and never changes what tofu reads or clicks; read when Chrome starts the relay",
         "kind": "bool"
+      },
+      {
+        "key": "browserProfile",
+        "category": "Browser",
+        "value": "",
+        "source": "default",
+        "label": "Browser profile",
+        "description": "the browser profile tofu drives, from tofu browser profile new: tofu starts the installed Chrome on that profile's own folder under the tofu home, so a site signed in once with tofu browser profile login stays signed in. empty drives your own Chrome through the extension",
+        "kind": "text"
+      },
+      {
+        "key": "browserHeadless",
+        "category": "Browser",
+        "value": true,
+        "source": "default",
+        "label": "Browser headless",
+        "description": "a Chrome tofu starts on a browser profile runs with no window; false shows its window. read when that Chrome starts, and never by your own Chrome",
+        "kind": "bool"
       }
     ]
   },

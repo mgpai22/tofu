@@ -1097,13 +1097,15 @@ func assembleRunTools(dir, set string, ledger *turn.ReadLedger, warm *warmProces
 	home, _ := os.UserHomeDir()
 	settingsDir := cmp.Or(dir, ".")
 	browserTools, browserErr := tools.NewBrowser(tools.BrowserSettings{
-		Home:   home,
-		Mode:   settingText(settingsDir, settingspkg.Browser, nil),
-		Driver: settingText(settingsDir, settingspkg.BrowserDriver, nil),
-		Steps:  settingInt(settingsDir, settingspkg.BrowserSteps, nil),
-		Judge:  func() (jevloop.Jev, error) { return browserJudge(dir) },
-		Model:  func() (turn.Model, string, error) { return browserModel(settingsDir) },
-		Tabs:   warm.tabs,
+		Home:     home,
+		Profile:  settingText(settingsDir, settingspkg.BrowserProfile, nil),
+		Headless: settingInt(settingsDir, settingspkg.BrowserHeadless, nil) != 0,
+		Mode:     settingText(settingsDir, settingspkg.Browser, nil),
+		Driver:   settingText(settingsDir, settingspkg.BrowserDriver, nil),
+		Steps:    settingInt(settingsDir, settingspkg.BrowserSteps, nil),
+		Judge:    func() (jevloop.Jev, error) { return browserJudge(dir) },
+		Model:    func() (turn.Model, string, error) { return browserModel(settingsDir) },
+		Tabs:     warm.tabs,
 	})
 	if err := cmp.Or(webErr, browserErr); err != nil {
 		return nil, nil, err

@@ -19,7 +19,7 @@ The settings come in groups:
 - Shell: persistentRegistry, logTail, killConfirm, shell, foldHidesShell
 - Turn: decisionCap, turnMaySpawn, oneTurnPerProject, sideChatAccess, subAgentsPerTurn, subAgentDepth, subAgentCache, subAgentCheckSeconds, subAgentWatchSeconds, verifySubAgents, agentSources, modelTier.genius, modelTier.smart, modelTier.worker, modelTier.dumb
 - Projects: projectManagement (boardy, the ticket board), boardFlow (the words boardy uses), scratchCleanupDays and scratchMaxGB (the scratchpad)
-- Browser: browser, browserDriver, browserSteps, browserModel, browserEffort, browserCursor
+- Browser: browser, browserDriver, browserSteps, browserModel, browserEffort, browserCursor, browserProfile, browserHeadless
 
 `gatePrompt` is `auto` by default, which is auto mode: Jev decides at every
 gate and the work does not stop for you. Only a call it denies is refused,

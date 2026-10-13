@@ -29,7 +29,7 @@ import (
 )
 
 type browserSession struct {
-	home    string
+	at      browser.Endpoint
 	mu      sync.Mutex
 	client  *browser.Client
 	driver  *browser.Driver
@@ -42,23 +42,34 @@ type browserSession struct {
 const noTabYet = "tofu has no tab of its own for this task yet: act with navigate to a url, which opens one"
 
 type BrowserSettings struct {
-	Home   string
-	Mode   string
-	Driver string
-	Steps  int
-	Judge  func() (jevloop.Jev, error)
-	Model  func() (turn.Model, string, error)
-	Tabs   *BrowserTabs
+	Home     string
+	Profile  string
+	Headless bool
+	Mode     string
+	Driver   string
+	Steps    int
+	Judge    func() (jevloop.Jev, error)
+	Model    func() (turn.Model, string, error)
+	Tabs     *BrowserTabs
 }
 
 type BrowserTabs struct {
-	home   string
+	at     browser.Endpoint
 	mu     sync.Mutex
 	opened map[int]string
 }
 
 func NewBrowserTabs(home string) *BrowserTabs {
-	return &BrowserTabs{home: home, opened: map[int]string{}}
+	return &BrowserTabs{at: browser.Endpoint{Home: home}, opened: map[int]string{}}
+}
+
+func (t *BrowserTabs) reach(at browser.Endpoint) {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.at = at
 }
 
 func (t *BrowserTabs) opens(ctx context.Context, tab int) {
@@ -87,7 +98,7 @@ func (t *BrowserTabs) closeWhere(openedBy func(string) bool) {
 	if !slices.ContainsFunc(slices.Collect(maps.Values(t.opened)), openedBy) {
 		return
 	}
-	client, err := browser.Dial(t.home)
+	client, err := t.at.Dial()
 	if err != nil {
 		return
 	}
@@ -105,7 +116,9 @@ func NewBrowser(config BrowserSettings) ([]turn.Tool, error) {
 	if config.Mode == settings.BrowserOff {
 		return nil, nil
 	}
-	session := &browserSession{home: config.Home, hosts: map[string]int{}, ownOnly: config.Driver == settings.DriverSubagent, tabs: config.Tabs}
+	at := browser.Endpoint{Home: config.Home, Profile: config.Profile, Headless: config.Headless}
+	config.Tabs.reach(at)
+	session := &browserSession{at: at, hosts: map[string]int{}, ownOnly: config.Driver == settings.DriverSubagent, tabs: config.Tabs}
 	var reads, acts turn.Tool
 	switch config.Driver {
 	case settings.DriverSteps, settings.DriverSubagent:
@@ -137,7 +150,7 @@ func (s *browserSession) driverOn(client *browser.Client) *browser.Driver {
 func (s *browserSession) redial() (*browser.Driver, error) {
 	_ = s.client.Close()
 	s.client = nil
-	client, err := browser.Dial(s.home)
+	client, err := s.at.Dial()
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +202,7 @@ func (s *browserSession) with(use func(*browser.Client) error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.client == nil {
-		client, err := browser.Dial(s.home)
+		client, err := s.at.Dial()
 		if err != nil {
 			return err
 		}
@@ -994,12 +1007,13 @@ func (s *browserSession) batch(ctx context.Context, tab int, steps []browserStep
 	return turn.Result{Content: changes + report.String() + web.Untrusted(fmt.Sprintf("Chrome tab %d", tab), window(snapshot, 1, !loads)), Command: fmt.Sprintf("tab %d act %d", tab, ran)}, checks.failed, nil
 }
 
-func BrowserBatch(ctx context.Context, home string, tabs *BrowserTabs, tab int, steps []byte) (string, int, error) {
+func BrowserBatch(ctx context.Context, at browser.Endpoint, tabs *BrowserTabs, tab int, steps []byte) (string, int, error) {
 	var parsed []browserStep
 	if err := json.Unmarshal(steps, &parsed); err != nil {
 		return "", 0, fmt.Errorf("the batch is not a JSON list of browser_act actions: %w", err)
 	}
-	session := &browserSession{home: home, tabs: tabs}
+	tabs.reach(at)
+	session := &browserSession{at: at, tabs: tabs}
 	defer func() {
 		if session.client != nil {
 			_ = session.client.Close()
@@ -1056,7 +1070,7 @@ func (t browserMotion) Run(ctx context.Context, raw json.RawMessage) (turn.Resul
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return turn.Result{}, fmt.Errorf("browser_motion: arguments are not the expected shape: %w", err)
 	}
-	root := filepath.Join(t.session.home, sys.StateDirName, "motion")
+	root := filepath.Join(t.session.at.Home, sys.StateDirName, "motion")
 	if place, found := sys.ScratchOf(ctx); found {
 		root = filepath.Join(place.SessionDir(), "motion")
 	}

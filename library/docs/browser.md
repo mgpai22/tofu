@@ -84,6 +84,7 @@ The settings:
 - `browserSteps`: how many actions one `browser_do` task may take, 1 to 60.
 - `browserModel`: the model the `browser` sub-agent and `browser_do` run on, as `source/model`, any model you have. Empty takes `modelTier.dumb`, then `modelTier.worker`, then the turn's own model. `browserEffort` sets its effort when the model lists it; empty is the model's default.
 - `browserCursor`, on by default: a small cursor labelled `tofu` glides to each click in tofu's own tab. It is drawn only, and never read or hit.
+- `browserProfile`, empty by default, names a browser profile, a Chrome profile of tofu's own in `~/.tofu/browser/profiles/<name>`, that tofu drives instead of your Chrome; empty drives your Chrome through the extension. tofu starts the installed Chrome on that folder, with no window while `browserHeadless` is on, its default, reads the port Chrome writes to `DevToolsActivePort` there and drives it with no extension. Later calls attach to the same Chrome, so tabs, cookies and sign-ins carry over, and every tab in it is tofu's own. `tofu browser profile new <name>` makes one, `login <name> [<url>]` opens a window with no debugger to sign in by hand, Google by default, `list` shows each as `running` or `stopped`, `stop` closes its Chrome and `remove` deletes it. `tofu browser read [--tab <id>]` prints a tab's title and address. tofu never starts Chrome on your own profile folder.
 
     tofu settings set browserModel claude-sub/claude-sonnet-5
 

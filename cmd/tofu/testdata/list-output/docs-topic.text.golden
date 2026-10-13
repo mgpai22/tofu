@@ -24,7 +24,7 @@ What it is
   - Projects: projectManagement (boardy, the ticket board), boardFlow (the words
     boardy uses), scratchCleanupDays and scratchMaxGB (the scratchpad)
   - Browser: browser, browserDriver, browserSteps, browserModel, browserEffort,
-    browserCursor
+    browserCursor, browserProfile, browserHeadless
 
   `gatePrompt` is `auto` by default, which is auto mode: Jev decides at every
   gate and the work does not stop for you. Only a call it denies is refused, and
@@ -346,4 +346,14 @@ Browser
       a small cursor labelled tofu glides to each click in tofu's own tab, so
       you can see where it acts; it is drawn only, and never changes what tofu
       reads or clicks; read when Chrome starts the relay
+    browserProfile          empty
+      any text
+      the browser profile tofu drives, from tofu browser profile new: tofu
+      starts the installed Chrome on that profile's own folder under the tofu
+      home, so a site signed in once with tofu browser profile login stays
+      signed in. empty drives your own Chrome through the extension
+    browserHeadless         true
+      true or false
+      a Chrome tofu starts on a browser profile runs with no window; false shows
+      its window. read when that Chrome starts, and never by your own Chrome
 --- stderr

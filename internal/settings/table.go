@@ -90,6 +90,8 @@ const (
 	BrowserModel           = "browserModel"
 	BrowserEffort          = "browserEffort"
 	BrowserCursor          = "browserCursor"
+	BrowserProfile         = "browserProfile"
+	BrowserHeadless        = "browserHeadless"
 )
 
 const (
@@ -313,6 +315,8 @@ func Default() []Spec {
 		{Key: BrowserEffort, Label: "Browser effort", Description: "the effort the browser sub-agent runs at, when its model lists it; empty runs it at the model's own default, the lowest it lists at or above low", Category: "Browser", Kind: Text,
 			Choices: []string{"", "low", "medium", "high", "xhigh", "max"}},
 		{Key: BrowserCursor, Label: "Browser cursor", Description: "a small cursor labelled tofu glides to each click in tofu's own tab, so you can see where it acts; it is drawn only, and never changes what tofu reads or clicks; read when Chrome starts the relay", Category: "Browser", Kind: Bool, Default: 1},
+		{Key: BrowserProfile, Label: "Browser profile", Description: "the browser profile tofu drives, from tofu browser profile new: tofu starts the installed Chrome on that profile's own folder under the tofu home, so a site signed in once with tofu browser profile login stays signed in. empty drives your own Chrome through the extension", Category: "Browser", Kind: Text},
+		{Key: BrowserHeadless, Label: "Browser headless", Description: "a Chrome tofu starts on a browser profile runs with no window; false shows its window. read when that Chrome starts, and never by your own Chrome", Category: "Browser", Kind: Bool, Default: 1},
 	}
 	for i := range specs {
 		specs[i].Group = specs[i].Category
