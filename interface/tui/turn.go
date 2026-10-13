@@ -17,6 +17,7 @@ import (
 	"tofu/interface/tui/shells"
 	"tofu/interface/tui/subagent"
 	"tofu/interface/tui/trace"
+	"tofu/internal/command"
 	"tofu/internal/host"
 	"tofu/internal/judge/jev"
 	"tofu/internal/konst"
@@ -90,6 +91,11 @@ func (a *App) send() tea.Cmd {
 		return nil
 	}
 	a.rememberPrompt(whole)
+	whole, refused := command.Expand(whole, cmp.Or(a.options.Root, "."))
+	if refused != nil {
+		a.view.Append(session.Entry{Kind: session.Note, Body: refused.Error()})
+		return nil
+	}
 	a.view.Reset()
 	if a.busy {
 		a.view.Queue(task, whole, chips)

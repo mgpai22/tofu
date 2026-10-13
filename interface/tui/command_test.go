@@ -2,6 +2,10 @@ package tui
 
 import (
 	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +14,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"tofu/interface/tui/palette"
+	"tofu/internal/command"
 	"tofu/internal/golden"
 )
 
@@ -153,7 +158,9 @@ func TestEveryListedCommandRunsAndNoneIsAName(t *testing.T) {
 			if content := ansi.Strip(app.View().Content); strings.Contains(content, "there is no /") {
 				t.Fatalf("/%s is listed and does nothing\n%s", known.Name, content)
 			}
-			nothingEntered(t, entered)
+			if !slices.ContainsFunc(command.Table(), func(one command.Command) bool { return one.Name == known.Name && one.Starts() }) {
+				nothingEntered(t, entered)
+			}
 		})
 	}
 }
@@ -322,4 +329,101 @@ func TestASlashOnTheSecondLineIsNotACommand(t *testing.T) {
 	if app.current != screenChat {
 		t.Error("the second line opened a screen")
 	}
+}
+
+func committedRepo(t *testing.T, change string) string {
+	t.Helper()
+	dir := t.TempDir()
+	git := func(args ...string) {
+		if out, err := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.com"}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	write := func(text string) {
+		if err := os.WriteFile(filepath.Join(dir, "note.txt"), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git("init", "-q")
+	write("one\n")
+	git("add", "note.txt")
+	git("commit", "-q", "-m", "first")
+	write(change)
+	return dir
+}
+
+func sentFor(t *testing.T, root, typed string) (string, string) {
+	t.Helper()
+	entered := make(chan string, 1)
+	app := commandApp(t, entered)
+	app.options.Root = root
+	typeText(app, typed)
+	app.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	select {
+	case sent := <-entered:
+		return sent, ansi.Strip(app.View().Content)
+	case <-time.After(2 * time.Second):
+		t.Fatalf("%q started no turn\n%s", typed, ansi.Strip(app.View().Content))
+	}
+	return "", ""
+}
+
+func TestTheCommandsSimplifyDebugAndHuntStartATurnCarryingTheirSkill(t *testing.T) {
+	repo := committedRepo(t, "one\ntwo\n")
+	for _, one := range []struct {
+		typed   string
+		carries []string
+	}{
+		{"/simplify", []string{"# Simplify", "+two"}},
+		{"/debug the cursor jumps", []string{"# Debug", "the cursor jumps"}},
+		{"/hunt", []string{"# Hunt", "hunter", "skeptic", "referee"}},
+	} {
+		t.Run(one.typed, func(t *testing.T) {
+			sent, chat := sentFor(t, repo, one.typed)
+			for _, want := range one.carries {
+				if !strings.Contains(sent, want) {
+					t.Errorf("%q sent a first message without %q:\n%s", one.typed, want, sent)
+				}
+			}
+			if !strings.Contains(chat, one.typed) || strings.Contains(chat, one.carries[0]) {
+				t.Errorf("the chat should show what was typed, not the skill\n%s", chat)
+			}
+		})
+	}
+}
+
+func TestTheSimplifyCommandOnACleanTreeCarriesTheLastCommit(t *testing.T) {
+	sent, _ := sentFor(t, committedRepo(t, "one\n"), "/simplify")
+	if !strings.Contains(sent, "+one") {
+		t.Errorf("a clean tree sent no diff of the last commit:\n%s", sent)
+	}
+}
+
+func TestTheDebugCommandWithNoSymptomSaysHowAndKeepsTheDraft(t *testing.T) {
+	entered := make(chan string, 1)
+	app := commandApp(t, entered)
+	typeText(app, "/debug")
+	app.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if content := ansi.Strip(app.View().Content); !strings.Contains(content, "/debug <symptom>") {
+		t.Errorf("/debug with no symptom does not say how\n%s", content)
+	}
+	if draft := app.view.Value(); draft != "/debug" {
+		t.Errorf("the composer holds %q, want /debug kept to finish", draft)
+	}
+	nothingEntered(t, entered)
+}
+
+func TestTheHelpCommandListsEveryCommandOnALineAndSendsNothing(t *testing.T) {
+	entered := make(chan string, 1)
+	app := commandApp(t, entered)
+	app.Update(tea.WindowSizeMsg{Width: 160, Height: 60})
+	typeText(app, "/help")
+	app.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	content := ansi.Strip(app.View().Content)
+	for _, want := range []string{"/simplify", "/debug <symptom>", "/hunt"} {
+		if !strings.Contains(content, want) {
+			t.Errorf("/help does not list %s\n%s", want, content)
+		}
+	}
+	nothingEntered(t, entered)
 }

@@ -10,20 +10,24 @@ const (
 type Needs string
 
 const (
-	Always  Needs = "always"
-	Reload  Needs = "reload"
-	Resume  Needs = "resume"
-	Fresh   Needs = "new"
-	Compact Needs = "compact"
-	Undo    Needs = "undo"
-	Cron    Needs = "cron"
+	Always   Needs = "always"
+	Reload   Needs = "reload"
+	Resume   Needs = "resume"
+	Fresh    Needs = "new"
+	Compact  Needs = "compact"
+	Undo     Needs = "undo"
+	Cron     Needs = "cron"
+	Turn     Needs = "turn"
+	DiffTurn Needs = "diff-turn"
 )
 
 func (Scope) Enum() []string { return []string{string(Tofu), string(Interface)} }
 
 func (Needs) Enum() []string {
-	return []string{string(Always), string(Reload), string(Resume), string(Fresh), string(Compact), string(Undo), string(Cron)}
+	return []string{string(Always), string(Reload), string(Resume), string(Fresh), string(Compact), string(Undo), string(Cron), string(Turn), string(DiffTurn)}
 }
+
+func (c Command) Starts() bool { return c.Needs == Turn || c.Needs == DiffTurn }
 
 type Command struct {
 	Name    string `json:"name"`
@@ -58,6 +62,10 @@ func Table() []Command {
 		{Name: "cron", Args: "[list | history | edit | pause | resume | delete]", Summary: "the scheduled jobs: list, history, edit, pause, resume, delete", Scope: Tofu, Needs: Cron},
 		{Name: "loop", Args: "<interval> <prompt>", Summary: "repeat a prompt on an interval: /loop 10m <prompt>", Scope: Tofu, Needs: Cron},
 		{Name: "goal", Args: `<prompt> --until "<cmd>"`, Summary: `fire after each turn until a check passes: /goal <prompt> --until "<cmd>"`, Scope: Tofu, Needs: Cron},
+		{Name: "simplify", Summary: "review the last diff and keep only a change that shrinks the code", Scope: Tofu, Needs: DiffTurn},
+		{Name: "debug", Args: "<symptom>", Summary: "reproduce the symptom, then find and fix its cause: /debug <symptom>", Scope: Tofu, Needs: Turn},
+		{Name: "hunt", Args: "[where]", Summary: "a hunter and a skeptic look for bugs, a referee keeps what can be shown", Scope: Tofu, Needs: Turn},
+		{Name: "help", Summary: "every command and what it does, one line each", Scope: Interface, Needs: Always},
 		{Name: "quit", Summary: "leave tofu", Scope: Interface, Needs: Always},
 	}
 }

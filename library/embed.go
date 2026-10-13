@@ -7,7 +7,7 @@ import (
 
 //go:embed models/*/*.yaml subscriptions/*.yaml
 //go:embed general/rules/*.yaml dev/rules/*.yaml dev/go/rules/*.yaml dev/go/references/*.md
-//go:embed dev/agents/*.md dev/references/*.md dev/typescript/rules/*.yaml dev/typescript/references/*.md
+//go:embed dev/agents/*.md dev/skills/*.md dev/references/*.md dev/typescript/rules/*.yaml dev/typescript/references/*.md
 //go:embed dev/rust/rules/*.yaml dev/rust/references/*.md
 //go:embed dev/gpui/rules/*.yaml dev/gpui/references/*.md
 //go:embed dev/python/rules/*.yaml dev/python/references/*.md

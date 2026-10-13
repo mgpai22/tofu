@@ -1,6 +1,6 @@
 exit 1
 --- stdout
-Sub-agents · 10 defined                                               ✗ 1 broken
+Sub-agents · 13 defined                                               ✗ 1 broken
 
   ○ idle      inherit                   project  runs on the orchestrator's
     model
@@ -17,6 +17,11 @@ Sub-agents · 10 defined                                               ✗ 1 bro
     reference  go-errors-and-context  3.9 KB
     reference  go-concurrency  3.8 KB
     reference  go-traps  4.0 KB
+  ○ hunter    inherit                   library  Reads the files it is given
+    and reports every defect it can point at, as structured findings with path,
+    line, kind and the input that triggers it. Read-only. Spawned by /hunt, one
+    per shard; a skeptic checks what it finds.
+    tools      read, glob, search, symbols, bash
   ○ py-dev    inherit                   library  Writes and fixes Python in
     the project it is given. Reads pyproject.toml, the lockfile and the
     project's own gate before it edits, runs every tool through the project's
@@ -27,6 +32,12 @@ Sub-agents · 10 defined                                               ✗ 1 bro
     reference  py-errors-and-resources  3.5 KB
     reference  py-async  3.2 KB
     reference  py-typing  3.2 KB
+  ○ referee   inherit                   library  Rules on each finding after
+    the hunter and the skeptic have both reported, reading the code itself, and
+    confirms a defect only when it can show it now with a failing test, a
+    reproduction, or an input and the path it takes. Spawned by /hunt last;
+    writes only in its scratch folder.
+    tools      read, glob, search, symbols, bash, write
   ○ rust-dev  inherit                   library  Writes and fixes Rust in the
     project it is given. Reads the manifest and the toolchain before it edits,
     changes the least it can, and is done only when cargo check, clippy, the
@@ -36,6 +47,11 @@ Sub-agents · 10 defined                                               ✗ 1 bro
     reference  rust-errors-and-ownership  3.7 KB
     reference  rust-async  3.0 KB
     reference  rust-unsafe  4.0 KB
+  ○ skeptic   inherit                   library  Challenges a hunter's
+    findings one by one against the code, in a fresh context, and disproves only
+    what it can disprove with a quoted line. Read-only. Spawned by /hunt after
+    the hunters report; a referee rules on both.
+    tools      read, glob, search, symbols, bash
   ○ ts-dev    inherit                   library  Writes and fixes TypeScript
     in the project it is given. Reads before it edits, changes the least it can,
     and is done only when the project's own typecheck, lint and tests pass.

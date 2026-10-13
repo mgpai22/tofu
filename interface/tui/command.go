@@ -47,7 +47,7 @@ func offered(options Options, needs command.Needs) bool {
 		return options.Compact != nil
 	case command.Undo:
 		return options.Undo != nil
-	case command.Cron:
+	case command.Cron, command.Turn, command.DiffTurn:
 		return options.Host != nil
 	}
 	panic("tui: unknown command need " + string(needs))
@@ -125,6 +125,17 @@ func (a *App) runCommand(name string) tea.Cmd {
 		a.carry(func() string { return a.options.Undo("") })
 	case "cron", "loop", "goal":
 		return a.cronLine("/" + name)
+	case "simplify", "debug", "hunt":
+		a.view.Insert("/" + name)
+		return a.send()
+	case "help":
+		var lines []string
+		for _, one := range command.Table() {
+			if offered(a.options, one.Needs) {
+				lines = append(lines, strings.TrimSpace("/"+one.Name+" "+one.Args)+"  "+one.Summary)
+			}
+		}
+		a.view.Append(session.Entry{Kind: session.Note, Body: strings.Join(lines, "\n")})
 	case "quit":
 		return tea.Quit
 	default:

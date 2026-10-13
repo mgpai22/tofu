@@ -44,7 +44,7 @@ tofu from a newer one. Beside the session, turn, settings and login methods, the
 | Family | Requests | What they answer |
 |---|---|---|
 | `boards` | `query.session`, `query.usage.history`, `query.limits`, `query.skills`, `query.ledger.summary`, `session.turns` | the fork tree; usage by hour or day with who spent it; each account's burn rate and when a window fills; the skills; a week of decisions per point; one digest per turn with its origin, outcome, held calls, sub-agents, files with line counts, tokens and cost |
-| `commands` | `query.commands` | every slash command with its arguments, what it does, whether it runs in tofu or only in the interface, and what a client needs to offer it |
+| `commands` | `query.commands` | every slash command with its arguments, what it does, whether it runs in tofu or only in the interface, and what a client needs to offer it; `needs` is `turn` or `diff-turn` for `/debug`, `/hunt` and `/simplify`, which start a model turn |
 | `memory` | `memory.add`, `memory.edit`, `memory.remove`, `memory.view`, `memory.zoom`, `memory.recall` | entries in the four scopes, and the episode and scope views opened line by line |
 | `sessions` | `session.open`, `session.close` | a second session opened beside a running turn, and one let go |
 | `side` | `session.branch`, `session.access` | a side chat beside the lead, from its latest point or one you name, with its own model and effort, and what it may write |

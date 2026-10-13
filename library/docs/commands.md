@@ -8,29 +8,32 @@ verbs: context, session, undo
 ## What it is
 
 Typing `/` at the start of the composer opens the command list. Typing more
-filters it, the arrow keys pick a row, tab completes, and enter runs it. A
-command never reaches the model. The list is one table: `tofu serve` answers it as `query.commands`.
+filters it, the arrow keys pick a row, tab completes, and enter runs it.
+`/simplify`, `/debug` and `/hunt` start a model turn: the model gets the
+command's skill, and the chat shows what you typed. Every other command runs
+in tofu and never reaches the model. `tofu serve` answers the list as
+`query.commands`; a command that starts a turn says `turn` or `diff-turn`.
 
+- `/help`: every command and what it does, one line each
+- `/simplify`: the first message carries the simplify skill and the last
+  diff, or the last commit on a clean tree; cuts wait for your approval
+- `/debug <symptom>`: reproduce, narrow, fix the cause, show it go green
+- `/hunt [where]`: spawns `hunter`, then `skeptic`, then `referee` after
+  both report; only what can be shown now is kept, nothing is fixed
 - `/chat`, `/sub-agents`, `/file-edits`, `/shells`, `/settings`: open that screen
 - `/models`: choose the model the next turn runs
 - `/status`: each subscription's quota windows and when they reset
 - `/attach`: reference a file in this workspace
-- `/keys`: every key the app answers to, grouped, with what it does; the
-  rebindable ones show the key bound now. Type to filter, esc closes
+- `/keys`: every key the app answers to, with the key bound now; type to filter
 - `/links`: every link this conversation carried, newest first
-- `/quote`: cite a past turn by id; the `[message#id]` beside any message
-  in the chat works the same when typed
+- `/quote`: cite a past turn by id, as `[message#id]` typed does
 - `/copy`, `/copy-call`: put the last answer, or the last tool call and its result, on the clipboard
-- `/reload`: read settings, rules, skills, sub-agents, models,
-  instructions and keys from disk again
-- `/resume`: pick a session of this project, newest first, and carry it
-  into the next task; typing filters by name and first line, the one in use
-  is marked, and the chat shows the chosen session's turns; `/resume <name
-  or id>` takes that session straight away
+- `/reload`: read settings, rules, skills, sub-agents, models, instructions and keys again
+- `/resume`: pick a session of this project, newest first, and carry it into
+  the next task; `/resume <name or id>` takes that session straight away
 - `/new`: start fresh, carrying nothing from the last session
 - `/compact`: shrink the old tool results the next turn carries
-- `/undo`, `/undo N`: put back the files the last turn, or the last N
-  turns, changed
+- `/undo`, `/undo N`: put back the files the last turn, or the last N, changed
 - `/cron`, `/loop`, `/goal`: scheduled and repeated prompts
 - `/quit`: leave tofu
 - `!git status`, or any `!` prompt: runs in the project as the `bash` tool
@@ -102,10 +105,6 @@ lists the new session at the head, beside the one it continues.
 
 shows the fork, its kind and the counts:
 `fork  into 6eae6fe1-... · compact · 1599 → 695 tokens`.
-
-    tofu context
-
-after the next turn shows how full the history is now.
 
     git status --short
 
