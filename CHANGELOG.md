@@ -10,6 +10,22 @@ The minor number carries breaking changes, which is what 0.x means, and **there 
 
 ## Unreleased
 
+## 0.5.13 - 2026-10-13
+
+A longer context, a plan before every step, and sub-agents that report together.
+
+### Added
+
+- The context ceiling is 450k tokens where it was 250k, so a session forks about half as often on a 1M-window model; the `contextCeiling` setting sends it back, and `TOFU_CONTEXT_CEILING` and `--context-ceiling` still win.
+- When the lead holds a plan, every request carries it after the cached part of the prompt, so the cache reads what it read without it; `planEveryStep` turns it off. Every step carries a phase, explore, edit, verify or report, and `tofu session trace` shows it.
+- `tofu boardy new --parent DEMO-1` makes a sub-ticket `DEMO-1-1` whose owns must sit inside its parent's; `tofu boardy show <ID> --thread` lists what was asked, answered, spawned and reported on a ticket.
+- `tofu learn` lists the jobs repeated across sessions with the same tools, how often, and what each cost.
+
+### Changed
+
+- Sub-agents that finish within a second and a half of each other reach the lead as one turn; an ask, a blocked report or a report the lead is waiting on goes at once, and a check-in never starts a lead turn of its own.
+- `tofu app` and `tofu serve` collect garbage about half as often (GOGC 200 with a 512 MiB soft limit) unless `GOGC` or `GOMEMLIMIT` is set.
+
 ## 0.5.12 - 2026-10-13
 
 A board that asks the person in one minute, hooks that run as tofu itself, and a faster start.

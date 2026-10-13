@@ -118,3 +118,10 @@ tofu docs serve-methods
 ```
 
 `tofu docs serve` and `tofu docs serve-methods` print the full reference of events and requests.
+
+## Memory
+
+`tofu serve` and `tofu app` run for hours, so they collect garbage about half
+as often as a short command: Go's `GOGC` at 200 with a 512 MiB soft memory
+limit. Set `GOGC` or `GOMEMLIMIT` in the environment and tofu leaves the
+runtime as you set it.

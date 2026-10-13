@@ -89,6 +89,16 @@ per language.
   code before it runs, outside your repository and without your secrets.
 - **Faster**: `tofu version` starts in about 200 ms where it took 320, and
   the sub-agents screen allocates 1 MB a frame where it took 18.
+- **Longer context**: a 450k ceiling, about half as many forks on a
+  1M-window model, and a setting to go back. See
+  [Context](/docs/features/context).
+- **A plan before every step**: the lead's plan rides with each request
+  without breaking the prompt cache, and every step carries a phase.
+- **Reports together**: sub-agents that finish together reach the lead as
+  one turn, and check-ins never wake it. See
+  [Orchestration](/docs/features/orchestration).
+- **Sub-tickets and threads** in Boardy, and `tofu learn` names the jobs you
+  repeat and what each costs.
 
 ## 0.4
 
