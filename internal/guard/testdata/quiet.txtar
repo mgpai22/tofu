@@ -1,0 +1,20 @@
+git init -q
+-- .gitignore --
+.local
+.claude
+-- .local/boji/tickets/doing/TOFU-9002.md --
+---
+id: TOFU-9002
+title: hooks
+owns:
+  - .claude/hooks/**
+owner: orchestrator
+---
+
+## Acceptance
+
+- hooks run
+-- internal/alpha/a.go --
+package alpha
+
+func A() {}

@@ -1,6 +1,6 @@
 exit 0
 --- stdout
-Docs · "change the colours"                                           65 matches
+Docs · "change the colours"                                           67 matches
 
   change the colours
     → tofu settings set theme Nord
@@ -32,6 +32,8 @@ Docs · "change the colours"                                           65 matche
     → tofu docs drive
   The gate
     → tofu docs gate
+  Guard rules
+    → tofu docs guard
   Hooks
     → tofu docs hooks
   Keys
@@ -118,6 +120,8 @@ Docs · "change the colours"                                           65 matche
     → /goal make the test pass --until "go test ./..."
   find a prompt I sent in another session
     → ctrl+p in the app, type part of it, then enter
+  check a commit message the way the git hook does
+    → tofu guard git commit-msg .git/COMMIT_EDITMSG
   Files tofu reads and writes
     → tofu docs files
   Instruction files

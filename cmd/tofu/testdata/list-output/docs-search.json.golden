@@ -69,6 +69,10 @@ exit 0
         "do": "tofu docs gate"
       },
       {
+        "text": "Guard rules",
+        "do": "tofu docs guard"
+      },
+      {
         "text": "Hooks",
         "do": "tofu docs hooks"
       },
@@ -239,6 +243,10 @@ exit 0
       {
         "text": "find a prompt I sent in another session",
         "do": "ctrl+p in the app, type part of it, then enter"
+      },
+      {
+        "text": "check a commit message the way the git hook does",
+        "do": "tofu guard git commit-msg .git/COMMIT_EDITMSG"
       },
       {
         "text": "Files tofu reads and writes",

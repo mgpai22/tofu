@@ -1,0 +1,34 @@
+git init -q
+git add -A
+git -c user.name=t -c user.email=t@example.com -c core.hooksPath=.nohooks commit -q -m start
+git -c user.name=t -c user.email=t@example.com -c core.hooksPath=.nohooks commit -q --allow-empty -F release.msg
+cp CHANGELOG.next CHANGELOG.md
+git add CHANGELOG.md
+-- release.msg --
+chore(release): 0.0.1
+-- CHANGELOG.md --
+# Changelog
+
+## 0.0.1
+
+### Added
+
+- `widget` turns.
+-- CHANGELOG.next --
+# Changelog
+
+## 0.0.2
+
+### Changed
+
+- `widget` turns faster.
+
+## 0.0.1
+
+### Added
+
+- `widget` turns.
+-- docs/widget.md --
+# Widget
+
+The widget turns.

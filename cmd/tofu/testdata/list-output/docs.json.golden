@@ -73,6 +73,11 @@ exit 0
         "summary": "what jev judges before a tool call runs, when tofu asks you first, and where the OpenRouter and TypeSafe keys live"
       },
       {
+        "topic": "guard",
+        "title": "Guard rules",
+        "summary": "the code rules a repository's Claude Code and git hooks enforce, run by tofu itself on Windows, Linux and macOS, with the same answers the old PowerShell scripts gave"
+      },
+      {
         "topic": "hooks",
         "title": "Hooks",
         "summary": "the Claude Code and codex hooks tofu runs around a tool call, a prompt and a turn's end, and how a project's hooks are trusted"
@@ -757,6 +762,18 @@ exit 0
         "do": "tofu serve --stdio",
         "check": "tofu serve --schema",
         "topic": "serve"
+      },
+      {
+        "ask": "run a Claude Code hook rule without PowerShell, on any OS",
+        "do": "tofu guard emdash < hook.json",
+        "check": "echo '{\"tool_input\":{\"command\":\"git worktree add x\"}}' | tofu guard shell",
+        "topic": "guard"
+      },
+      {
+        "ask": "check a commit message the way the git hook does",
+        "do": "tofu guard git commit-msg .git/COMMIT_EDITMSG",
+        "check": "tofu guard git release-docs .git/COMMIT_EDITMSG",
+        "topic": "guard"
       }
     ]
   },

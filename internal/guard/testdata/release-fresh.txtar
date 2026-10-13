@@ -1,0 +1,25 @@
+git init -q
+git add -A
+git -c user.name=t -c user.email=t@example.com -c core.hooksPath=.nohooks commit -q -m start
+-- CHANGELOG.md --
+# Changelog
+
+## 0.0.2
+
+### Added
+
+- `gizmo` spins.
+
+## 0.0.1
+
+### Added
+
+- `widget` turns.
+
+### Fixed
+
+- `sprocket` no longer squeaks.
+-- docs/widget.md --
+# Widget
+
+The widget turns.

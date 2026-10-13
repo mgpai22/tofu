@@ -1,0 +1,19 @@
+git init -q
+-- .gitignore --
+.local
+.claude
+-- .local/boji/tickets/done/TOFU-9010.md --
+---
+id: TOFU-9010
+owns:
+  - internal/alpha/**
+owner: go-dev
+---
+
+## Acceptance
+
+- alpha
+-- internal/alpha/a.go --
+package alpha
+
+func A() {}

@@ -394,3 +394,11 @@
   do: tofu serve --stdio
   check: tofu serve --schema
   topic: serve
+- ask: run a Claude Code hook rule without PowerShell, on any OS
+  do: tofu guard emdash < hook.json
+  check: echo '{"tool_input":{"command":"git worktree add x"}}' | tofu guard shell
+  topic: guard
+- ask: check a commit message the way the git hook does
+  do: tofu guard git commit-msg .git/COMMIT_EDITMSG
+  check: tofu guard git release-docs .git/COMMIT_EDITMSG
+  topic: guard

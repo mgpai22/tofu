@@ -1,0 +1,196 @@
+git init -q
+-- .gitignore --
+.local
+.claude
+-- .claude/agents/go-dev.md --
+---
+name: go-dev
+description: writes Go
+---
+-- .local/boji/tickets/doing/TOFU-9001.md --
+---
+id: TOFU-9001
+title: alpha
+owns:
+  - internal/alpha/**
+owner: go-dev
+---
+
+## Acceptance
+
+- alpha builds
+-- .local/boji/tickets/doing/TOFU-9002.md --
+---
+id: TOFU-9002
+title: hooks
+owns:
+  - .claude/hooks/**
+owner: orchestrator
+---
+
+## Acceptance
+
+- hooks run
+-- .local/boji/tickets/open/TOFU-9003.md --
+---
+id: TOFU-9003
+title: beta
+owns:
+  - internal/beta/**
+owner: go-dev
+---
+
+## Acceptance
+
+- beta builds
+-- .local/boji/tickets/open/TOFU-9004.md --
+---
+id: TOFU-9004
+title: no acceptance
+owns:
+  - internal/gamma/**
+owner: go-dev
+---
+
+## Scope
+
+- gamma
+-- .local/boji/tickets/open/TOFU-9005.md --
+---
+id: TOFU-9005
+title: no owns
+owner: go-dev
+---
+
+## Acceptance
+
+- something
+-- .local/boji/tickets/open/TOFU-9006.md --
+---
+id: TOFU-9006
+title: overlaps alpha
+owns:
+  - internal/alpha/x.go
+owner: go-dev
+---
+
+## Acceptance
+
+- x
+-- .local/boji/tickets/open/TOFU-9007.md --
+---
+id: TOFU-9007
+title: no owner
+owns:
+  - internal/delta/**
+---
+
+## Acceptance
+
+- delta
+-- .local/boji/tickets/open/TOFU-9008.md --
+---
+id: TOFU-9008
+title: unknown owner
+owns:
+  - internal/epsilon/**
+owner: wizard
+---
+
+## Acceptance
+
+- epsilon
+-- .local/boji/tickets/open/TOFU-9009.md --
+---
+id: TOFU-9009
+title: orchestrator work
+owns:
+  - internal/phi/**
+owner: orchestrator
+---
+
+## Acceptance
+
+- phi
+-- .local/boji/tickets/done/TOFU-9010.md --
+---
+id: TOFU-9010
+owns:
+  - internal/omega/**
+owner: go-dev
+---
+
+## Acceptance
+
+- omega
+-- .local/boji/tickets/review/TOFU-9020.md --
+---
+id: TOFU-9020
+owns:
+  - internal/rho/**
+owner: go-dev
+---
+
+## Acceptance
+
+- rho
+
+## Log
+
+ran it, fine
+-- .local/boji/tickets/review/TOFU-9021.md --
+---
+id: TOFU-9021
+owns:
+  - internal/sigma/**
+owner: go-dev
+---
+
+## Acceptance
+
+- sigma
+
+## Log
+
+go test -p 1 ./internal/sigma/ printed ok tofu/internal/sigma 0.412s, and the
+driven run printed the expected screen at 120x40, pasted below in full so the
+reviewer can read it without running anything again. Every acceptance line has
+its own evidence and a person could repeat each one.
+-- .local/boji/tickets/review/TOFU-9022.md --
+---
+id: TOFU-9022
+owns:
+  - internal/tau/**
+owner: go-dev
+---
+
+## Acceptance
+
+- tau
+-- .local/research/fresh.md --
+---
+used_at: "TOFU-9030"
+planning_path: ""
+---
+
+fresh research
+-- .local/research/stale.md --
+---
+used_at: "TOFU-1"
+---
+
+stale research
+-- .local/research/unused.md --
+---
+title: never used
+---
+
+nothing
+-- internal/alpha/a.go --
+package alpha
+
+func A() {}
+-- internal/zeta/z.go --
+package zeta
+
+func Z() {}
