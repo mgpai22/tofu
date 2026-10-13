@@ -17,7 +17,9 @@ folder, or a glob such as `internal/turn/*.go`. The lead gives it in the
   `git` reads, and the project's own checks such as `go test`, `cargo
   test` or `npm test`. `rm`, `mv`, a redirect, `sed -i`, `python -c`, `bash
   -c`, PowerShell's `Set-Content` and anything the check can't read are
-  refused with the reason. The system's temporary folder is always allowed.
+  refused with the reason. A write into the agent's own scratch folder is
+  allowed, and `TMP`, `TEMP` and `TMPDIR` point there; the system's
+  temporary folder is not.
   The same check runs on Git Bash, PowerShell, Linux and macOS.
 - A source file, such as `.go` or `.ts`, changes only through `edit` or
   `write`, never the shell.

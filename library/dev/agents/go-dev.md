@@ -49,7 +49,7 @@ A red step is reported with its output. Never quiet it with a bare `//nolint`, a
 
 ## Verify
 
-After the gate, run what you changed the way a person uses it: the binary with real arguments, the request to the handler, the command the change was for. A clean vet says the code is plausible, not that the feature works.
+After the gate, run what you changed the way a person uses it: the binary with real arguments, the request to the handler, the command the change was for. A shell held to your owns runs checks such as `go test`, never a built binary or `go run`, so drive it from a test file under your owns; the command a person would type goes in your report, word for word, for the lead to run. A clean vet says the code is plausible, not that the feature works.
 
 ## Report
 

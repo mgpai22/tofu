@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"tofu/internal/session"
+	"tofu/internal/turn"
 )
 
 type standingIn struct {
@@ -52,7 +53,7 @@ func (in standingIn) read() (map[string]Answer, error) {
 	if json.Unmarshal(body, &kept) != nil {
 		return standing, nil
 	}
-	for _, one := range kept {
+	for _, one := range slices.DeleteFunc(kept, heldInMemoryOnly) {
 		switch one.Decision {
 		case AllowAlways:
 			standing[one.Target] = AlwaysHere
@@ -67,7 +68,7 @@ func (in standingIn) keep(standing map[string]Answer) error {
 	if in.id == "" {
 		return nil
 	}
-	body, err := json.MarshalIndent(listed(standing), "", "  ")
+	body, err := json.MarshalIndent(slices.DeleteFunc(listed(standing), heldInMemoryOnly), "", "  ")
 	if err != nil {
 		return err
 	}
@@ -79,6 +80,10 @@ func (in standingIn) keep(standing map[string]Answer) error {
 		return err
 	}
 	return os.Rename(temporary, in.file())
+}
+
+func heldInMemoryOnly(one StandingAnswer) bool {
+	return one.Decision == AllowAlways && turn.PlacesCode(one.Target)
 }
 
 func listed(standing map[string]Answer) []StandingAnswer {

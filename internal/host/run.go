@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	placeWords    = 2
+	processDir    = "."
 	standingPoint = "standing"
 	cancelledAt   = "cancelled at"
 	hookTrustTool = "hooks"
@@ -431,34 +431,7 @@ func unattended(context.Context, turn.GateRequest, turn.GateDecision) (turn.Pers
 }
 
 func askedPlace(request turn.GateRequest) string {
-	var fields struct {
-		Path    string `json:"path"`
-		Command string `json:"command"`
-	}
-	if err := json.Unmarshal(request.Args, &fields); err != nil {
-		return request.Tool + " " + string(request.Args)
-	}
-	switch {
-	case fields.Path != "":
-		return request.Tool + " " + fields.Path
-	case fields.Command != "":
-		return request.Tool + " " + commandPlace(fields.Command)
-	}
-	return request.Tool + " " + string(request.Args)
-}
-
-func commandPlace(command string) string {
-	words, named := make([]string, 0, placeWords), 0
-	for _, word := range strings.Fields(command) {
-		if strings.HasPrefix(word, "-") {
-			words = append(words, word)
-			continue
-		}
-		if named++; named <= placeWords {
-			words = append(words, word)
-		}
-	}
-	return strings.Join(words, " ")
+	return turn.CallPlace(request, processDir)
 }
 
 func unreported(err error, reported []error) error {

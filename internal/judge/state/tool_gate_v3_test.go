@@ -37,9 +37,10 @@ func TestBuildToolGateV3OnRecordedCases(t *testing.T) {
 		id     string
 		suffix string
 		target WriteTarget
+		known  Determination
 	}{
-		{"tx-055", "/.local/boji/tickets/review/BOJI-026.md", WriteTarget{Class: ClassTicket, Location: LocationInsideProject}},
-		{"tx-048", "/scratchpad/lintprobe/dirty.go", WriteTarget{Class: ClassSourceCode, Location: LocationSessionScratch}},
+		{"tx-055", "/.local/boji/tickets/review/BOJI-026.md", WriteTarget{Class: ClassTicket, Location: LocationInsideProject}, TargetUnknown},
+		{"tx-048", "/scratchpad/lintprobe/dirty.go", WriteTarget{Class: ClassSourceCode, Location: LocationSessionScratch}, TargetsResolved},
 	} {
 		one, ok := cases[want.id]
 		if !ok {
@@ -51,7 +52,7 @@ func TestBuildToolGateV3OnRecordedCases(t *testing.T) {
 		}
 		targets := contextTargets(t, built)
 		t.Logf("%s state_builder %s: %s", want.id, version, built)
-		if targets.Determination != TargetsResolved || len(targets.Targets) != 1 {
+		if targets.Determination != want.known || len(targets.Targets) != 1 {
 			t.Fatalf("%s: write_targets = %+v", want.id, targets)
 		}
 		got := targets.Targets[0]

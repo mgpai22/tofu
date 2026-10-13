@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"tofu/internal/judge/ledger"
+	"tofu/internal/judge/state"
 	"tofu/internal/konst"
 	"tofu/internal/session"
 	"tofu/internal/subagent"
@@ -216,7 +217,7 @@ func (t *SpawnTool) orchestratorAnswers(held *heldSubAgent, site spawnSite) Pers
 			site.notice(id, id+"'s "+request.Tool+" call keeps to its own scratch folder, so it runs without asking the orchestrator")
 			return PersonNotAskedOwnScratch, nil
 		}
-		because, place, answers := "the gate's verdict is ask"+standing(decision.Reason), CallPlace(request), ""
+		because, place, answers := "the gate's verdict is ask"+standing(decision.Reason), CallPlace(request, t.Project), ""
 		switch {
 		case decision.HookAsk != "":
 			because, place = "a PreToolUse hook asks first: "+decision.HookAsk, ""
@@ -227,7 +228,10 @@ func (t *SpawnTool) orchestratorAnswers(held *heldSubAgent, site spawnSite) Pers
 			site.notice(id, id+"'s "+request.Tool+" call is "+place+", which the orchestrator allowed here for the rest of its run, so it runs without asking again")
 			return PersonAllowedOnce, nil
 		}
-		if place != "" {
+		switch {
+		case PlacesCode(place):
+			answers = ", or allow_here to run this exact code again from " + id + " without asking until its run ends"
+		case place != "":
 			answers = ", or allow_here to allow every call of this kind (" + place + ") from " + id + " until its run ends"
 		}
 		wait := konst.SubAgentGateAnswerMillis * time.Millisecond
@@ -294,16 +298,22 @@ func number(value float64) string {
 
 const SettingsToolName = "settings"
 
-const callPlaceWords = 2
+const (
+	callPlaceWords = 2
+	codePlace      = "code sha256:"
+)
 
-func CallPlace(request GateRequest) string {
+func CallPlace(request GateRequest, cwd string) string {
 	var args struct{ Path, Command string }
 	if json.Unmarshal(request.Args, &args) != nil {
 		return request.Tool + " " + string(request.Args)
 	}
+	sum, code := state.CodeHash(args.Command, cwd)
 	switch {
 	case args.Path != "":
 		return request.Tool + " " + args.Path
+	case code:
+		return request.Tool + " " + codePlace + sum
 	case args.Command != "":
 		words, named := make([]string, 0, callPlaceWords), 0
 		for _, word := range strings.Fields(args.Command) {
@@ -318,6 +328,11 @@ func CallPlace(request GateRequest) string {
 		return request.Tool + " " + strings.Join(words, " ")
 	}
 	return request.Tool + " " + string(request.Args)
+}
+
+func PlacesCode(place string) bool {
+	_, after, _ := strings.Cut(place, " ")
+	return strings.HasPrefix(after, codePlace)
 }
 
 func PersonOnly(project string, request GateRequest) bool {

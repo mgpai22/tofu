@@ -28,7 +28,7 @@ A clean typecheck says the types agree. A service is verified when it was starte
 
 ## Compare the numbers with the data
 
-- A count, total or sum is checked against a direct query on the same store, through the database's command line or a `node -e` with the project's own driver. Totals that disagree with their rows are a defect even when every status is 200.
+- A count, total or sum is checked against a direct query on the same store, through the database's command line or a test under your owns that queries it with the project's own driver. A shell held to your owns refuses `node -e` and every other inline code, so a query only that could make goes in your report for the lead to run. Totals that disagree with their rows are a defect even when every status is 200.
 - Paging: the total matches the query, the last page is short, and pages never overlap.
 
 ## Stop it

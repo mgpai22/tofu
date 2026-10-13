@@ -1,7 +1,12 @@
 package state
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"os"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -56,6 +61,10 @@ func (s *scan) segment(segment []string) {
 	if len(args) == 0 {
 		return
 	}
+	if runsCode(args) {
+		s.unresolved = true
+		return
+	}
 	operands := notFlags(args[1:])
 	switch programName(args[0]) {
 	case "cd":
@@ -83,12 +92,6 @@ func (s *scan) segment(segment []string) {
 		default:
 			s.unresolved = true
 		}
-	case "python", "python3", "py", "node", "ruby", "perl", "php", "pwsh", "powershell", "sh", "bash", "zsh":
-		for _, arg := range args[1:] {
-			if arg != "-" {
-				s.unresolved = true
-			}
-		}
 	case "sed":
 		if !hasInPlace(args[1:]) {
 			return
@@ -97,6 +100,43 @@ func (s *scan) segment(segment []string) {
 			s.sink(operand)
 		}
 	}
+}
+
+func runsCode(args []string) bool {
+	if codeRunner.MatchString(programName(args[0])) {
+		return true
+	}
+	return codeWrapper.MatchString(programName(args[0])) && slices.ContainsFunc(args[1:], func(arg string) bool { return codeRunner.MatchString(programName(arg)) })
+}
+
+func CodeHash(command, cwd string) (string, bool) {
+	shell, _ := splitHeredocs(command)
+	base, err := filepath.Abs(cwd)
+	if err != nil {
+		base = cwd
+	}
+	sum, code := sha256.New(), false
+	sum.Write([]byte(base + "\x00" + command))
+	for _, segment := range segments(tokens(shell)) {
+		if programName(segment[0]) == "cd" && len(segment) > 1 {
+			base = resolve(base, segment[1])
+		}
+		if !runsCode(segment) {
+			continue
+		}
+		code = true
+		for _, token := range segment {
+			script := resolve(base, token)
+			if info, err := os.Stat(script); err != nil || !info.Mode().IsRegular() {
+				continue
+			}
+			if body, err := os.ReadFile(script); err == nil {
+				sum.Write([]byte("\x00" + script + "\x00"))
+				sum.Write(body)
+			}
+		}
+	}
+	return hex.EncodeToString(sum.Sum(nil)), code
 }
 
 func hasInPlace(args []string) bool {
@@ -138,6 +178,8 @@ var (
 	heredocMarker = regexp.MustCompile(`^<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?`)
 	pythonOpen    = regexp.MustCompile(`open\(\s*([^,()]+?)\s*,\s*['"]([^'"]+)['"]`)
 	pythonString  = regexp.MustCompile(`^['"]([^'"]*)['"]$`)
+	codeRunner    = regexp.MustCompile(`^(python[0-9.]*w?|py|node|deno|bun|ruby|perl|php|pwsh|powershell|sh|bash|zsh|rscript|eval|source|\.)$`)
+	codeWrapper   = regexp.MustCompile(`^(env|uv|uvx|npx|bunx|pnpx|xargs|exec|command|nohup|time|timeout|nice|sudo)$`)
 )
 
 func (s *scan) expand(value string) string {

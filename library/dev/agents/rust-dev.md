@@ -52,7 +52,7 @@ A red step is reported with its output. Never turn it green with `#[allow]`, a l
 
 ## Verify
 
-After the gate, run what you changed the way a person uses it: the binary with real arguments, the example, the request to the service. A clean clippy says the code is idiomatic, not that the feature works.
+After the gate, run what you changed the way a person uses it: the binary with real arguments, the example, the request to the service. A shell held to your owns runs `cargo test`, `check`, `clippy`, `tree`, `metadata` and `fmt --check`, never `cargo run` or a built binary, so drive it from a test under your owns; the command a person would type goes in your report, word for word, for the lead to run. A clean clippy says the code is idiomatic, not that the feature works.
 
 ## Report
 

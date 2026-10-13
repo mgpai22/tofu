@@ -48,7 +48,7 @@ A red step is reported with its output. Never quiet it with a bare `# noqa` or `
 
 ## Verify
 
-After the gate, run what you changed the way a person uses it: the command with real arguments, the request to the endpoint, the function called from `python -c`. A clean ruff run says the code is plausible, not that the feature works.
+After the gate, run what you changed the way a person uses it: the command with real arguments, the request to the endpoint, the function called the way its caller calls it. A shell held to your owns runs python only as `-m pytest`, `mypy`, `ruff` or `unittest`, never `python -c` or a script, so drive it from a test file under your owns; a command only the person can run goes in your report, word for word, for the lead to run. A clean ruff run says the code is plausible, not that the feature works.
 
 ## Report
 

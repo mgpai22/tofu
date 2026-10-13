@@ -43,7 +43,7 @@ Sub-agents · 10 defined                                               ✗ 1 bro
     reference  ts-strict-config  2.8 KB
     reference  ts-type-design  3.0 KB
     reference  ts-boundaries  2.4 KB
-    reference  verify-a-running-service  2.4 KB
+    reference  verify-a-running-service  2.5 KB
   ○ browser   inherit                   library  Does one browsing task in the
     person's Chrome, in a tab of tofu's own, step by step on the browser model,
     and reports what it did, what it found and the tab it left open. Give it the
@@ -69,7 +69,7 @@ Sub-agents · 10 defined                                               ✗ 1 bro
     reference  failure-triage  1.6 KB
     reference  metrics  1.9 KB
     reference  test-planning  2.1 KB
-    reference  verify-a-running-service  2.4 KB
+    reference  verify-a-running-service  2.5 KB
 
 broken
   ✗ ~/project/.tofu/agents/broken.md  the file opens with no front matter
