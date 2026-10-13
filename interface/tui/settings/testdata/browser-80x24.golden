@@ -10,7 +10,7 @@
     Shell         05                                                            
     Turn          15      Browser steps                               30  ▾     
     Projects      04      how many actions one browser task may take            
-  › Browser       06                                                            
+  › Browser       08                                                            
                           Browser model                          default  ▾     
   NAVIGATE                the subscription model a browser task asks for th…    
   ↑↓ setting · ←→                                                               
