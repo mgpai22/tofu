@@ -10,6 +10,14 @@ The minor number carries breaking changes, which is what 0.x means, and **there 
 
 ## Unreleased
 
+## 0.5.11-fix1 - 2026-10-12
+
+A board keeps every ticket's owns.
+
+### Fixed
+
+- Boardy holds a ticket's owns only while it is in doing (or the statuses a board names in `holds` in board.toml): tickets in review, todo or done keep their owns as a record and never block each other, and two tickets in doing on the same paths are still refused, naming the holder. An owns entry may be an absolute path outside the project.
+
 ## 0.5.11 - 2026-10-10
 
 Long sessions stay fast on the sub-agents and shells screens, and one `tofu serve` holds several sessions at once.
