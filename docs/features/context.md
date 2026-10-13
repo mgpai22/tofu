@@ -40,9 +40,9 @@ billed input was a cache read.
 **A target from the model's window, with a cap.** tofu holds 20,000 tokens of
 the window for the answer and forks at 80% of the rest, so a 200,000 token
 model forks at 144,000. A million-token window does not make a million-token
-conversation cheap, so the usable window is capped at 250,000 and no model
-forks later than 200,000. A model with no known window uses 63,000, a quarter
-of that cap. No request past the ceiling is sent: tofu forks, or shrinks
+conversation cheap, so the usable window is capped at 450,000 and no model
+forks later than 360,000. A model with no known window uses 113,400, a
+quarter of that cap. No request past the ceiling is sent: tofu forks, or shrinks
 old results, before it, and refuses the request when neither brings it
 under. Separately, a request larger than the model's own window is refused
 before it is sent.
@@ -106,6 +106,12 @@ its first request, so the whole history is never sent first.
   `TOFU_CONTEXT_CEILING=100000 tofu`. It replaces the ceiling taken from the
   model's window, and the fork comes at 80% of it, 80,000 here, the same as a
   window that size.
+- **Change the cap for good**: `tofu settings set contextCeiling 250000`
+  brings back the 250,000 cap of 0.5.12 and earlier, and the next turn reads
+  it. A model whose window is smaller still stops at its window less the
+  answer's reserve. `TOFU_CONTEXT_CEILING` and `--context-ceiling` win over
+  it, and `tofu context` with no session yet prints the cap the next turn
+  takes.
 - **Read back a stored result**: the model calls `artifact_fetch` with the
   handle, an offset and a length, or `lookup` with a call id from a fork's
   carry. You don't need to.
@@ -128,12 +134,12 @@ tofu context
 Context · brisk-amber-heron · 5 steps                                   ✓ step 5
 
   task         explain this repository to me
-  identity     ▓▓░░░░░░░░░░  16%  1920 / 12000
-  facts        ░░░░░░░░░░░░   0%  0 / 3000
-  working set  ░░░░░░░░░░░░   0%  0 / 18000
-  recent       ▓▓▓▓▓▓▓▓░░░░  63%  19014 / 30000
-  total        ▓▓▓▓░░░░░░░░  33%  20934 / 63000
-  ceiling      ▓░░░░░░░░░░░   8%  20934 / 250000
+  identity     ▓░░░░░░░░░░░   8%  1920 / 21600
+  facts        ░░░░░░░░░░░░   0%  0 / 5400
+  working set  ░░░░░░░░░░░░   0%  0 / 32400
+  recent       ▓▓▓▓░░░░░░░░  35%  19014 / 54000
+  total        ▓▓░░░░░░░░░░  18%  20934 / 113400
+  ceiling      ░░░░░░░░░░░░   4%  20934 / 450000
   caps         recorded by the step
   bytes        2310 per thousand tokens
 ```

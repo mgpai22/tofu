@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	"tofu/internal/konst"
 	rc "tofu/internal/recall"
 )
 
-const ceiling = 250000
+const ceiling = konst.ContextCeilingTokens
 
 func Render(machine, date string, reach CorpusReach) string {
 	var out strings.Builder
@@ -28,7 +29,7 @@ func Render(machine, date string, reach CorpusReach) string {
 		tenth := reach.WithinShareOfCeiling(ceiling, 0.1)
 		fmt.Fprintf(&out, "within reach of the limit: %d session(s) at or above half the ceiling (%d tokens), %d at or above a quarter (%d tokens), %d at or above a tenth (%d tokens).\n\n",
 			half, ceiling/2, quarter, ceiling/4, tenth, ceiling/10)
-		fmt.Fprintf(&out, "**No recorded session has ever come within reach of the 250,000 token ceiling.** The largest peak on record, %d tokens, is %.1f%% of it.\n\n", highest, 100*float64(highest)/float64(ceiling))
+		fmt.Fprintf(&out, "**No recorded session has ever come within reach of the %d token ceiling.** The largest peak on record, %d tokens, is %.1f%% of it.\n\n", ceiling, highest, 100*float64(highest)/float64(ceiling))
 	}
 
 	shippedTarget := rc.ShippedBands().Target()
@@ -84,8 +85,8 @@ func Render(machine, date string, reach CorpusReach) string {
 	fmt.Fprintf(&out, "## The condition under which this starts to matter\n\n")
 	gapToCeiling := float64(ceiling) / float64(reach.Highest())
 	overShippedTarget := 100 * (float64(reach.Highest())/float64(shippedTarget) - 1)
-	fmt.Fprintf(&out, "**A session several times longer than the longest ever recorded, at the current ceiling, band shares and bytes-per-token estimate.** The largest peak on record here is %d tokens; the 250,000 ceiling is %.1fx that. `context-budget.md` v7 already measured a synthetic extension of a different recorded turn, the 44 step fixture peaking at 44,145 tokens used across BOJI-108, -119 and -138: a fork first appears at 48 steps on that extension, eight steps past its own real length. This report's own two real forks confirm the same shape independently, each firing the moment its session crossed the target recorded for it at the time, both well short of the ceiling and the higher of the two only %.1f%% over today's %d token shipped target. Three things would each pull the condition closer without any session getting longer: a lower `konst.ContextCeilingTokens` (a deliberate test lever already in the code, never shipped to a user), a model whose own window is smaller than the operating ceiling so the model's own wall is hit first, or a task shape that reads much larger results (this project's own source and docs) rather than the many small tool calls the recorded corpus is mostly made of.\n\n",
-		reach.Highest(), gapToCeiling, overShippedTarget, shippedTarget)
+	fmt.Fprintf(&out, "**A session several times longer than the longest ever recorded, at the current ceiling, band shares and bytes-per-token estimate.** The largest peak on record here is %d tokens; the %d ceiling is %.1fx that. `context-budget.md` v7 already measured a synthetic extension of a different recorded turn, the 44 step fixture peaking at 44,145 tokens used across BOJI-108, -119 and -138: a fork first appears at 48 steps on that extension, eight steps past its own real length. This report's own two real forks confirm the same shape independently, each firing the moment its session crossed the target recorded for it at the time, both well short of the ceiling and the higher of the two only %.1f%% over today's %d token shipped target. Three things would each pull the condition closer without any session getting longer: a lower `konst.ContextCeilingTokens` (a deliberate test lever already in the code, never shipped to a user), a model whose own window is smaller than the operating ceiling so the model's own wall is hit first, or a task shape that reads much larger results (this project's own source and docs) rather than the many small tool calls the recorded corpus is mostly made of.\n\n",
+		reach.Highest(), ceiling, gapToCeiling, overShippedTarget, shippedTarget)
 
 	fmt.Fprintf(&out, "## What this does not answer\n\n")
 	out.WriteString("- Whether a wrong eviction is visible when one happens: the two real forks never produced one to check against, so the re-fetch label is proved to work in code (`bench/recall/session.go`, `report-2026-09-20.md`) but has never caught a real mistake.\n")

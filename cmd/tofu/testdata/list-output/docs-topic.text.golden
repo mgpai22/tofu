@@ -13,8 +13,8 @@ What it is
   - Appearance: theme, density, animations, statusBar, colorMode
   - Interaction: composer, gatePrompt, readBeforeEdit, autoUpdate
   - Context: chatShowsTools, agentFeeds, showThinking, thinkingSummary, images,
-    projectInstructionsCap, instructionSources, skills, memory, autoMemory,
-    memoryFromAllUsers, learn
+    projectInstructionsCap, contextCeiling, instructionSources, skills, memory,
+    autoMemory, memoryFromAllUsers, learn
   - Files: diffContext, hyperlinks, groupByAgent
   - Shell: persistentRegistry, logTail, killConfirm, shell, foldHidesShell
   - Turn: decisionCap, turnMaySpawn, oneTurnPerProject, sideChatAccess,
@@ -155,6 +155,12 @@ Context
     projectInstructionsCap  32768
       1 to 262144 bytes of AGENTS.md and CLAUDE.md sent each turn
       bytes of your instruction files sent each turn
+    contextCeiling          450000
+      at least 1 tokens a request may carry
+      the most tokens one request may carry, and the conversation forks before
+      it; a model whose window is smaller stops at its window less the answer's
+      reserve. TOFU_CONTEXT_CEILING and --context-ceiling win over it, and the
+      next turn reads the new value
     instructionSources      agents-first
       one of agents-first, claude-first, both
       a folder with both AGENTS.md and CLAUDE.md sends one: agents-first sends

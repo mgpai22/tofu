@@ -6,12 +6,12 @@
     Appearance    05      decision cap per turn, zero means no cap                                  
     Models & rol… 02                                                                                
     Interaction   07      Sub-agents                                                        ● on    
-    Context       14      a turn may spawn a sub-agent                                              
+    Context       15      a turn may spawn a sub-agent                                              
     Files         03                                                                                
     Shell         05      One turn per project                                              ● on    
   › Turn          15      while one session runs a turn in this project, a turn from any other …    
     Projects      04                                                                                
-    Browser       06      Side chat access                                              read  ▾     
+    Browser       08      Side chat access                                              read  ▾     
                           what a new side chat may write: read writes nothing, notes writes .md…    
   NAVIGATE                                                                                          
   ↑↓ setting · ←→         Sub-agents running at once                                      10  ▾     

@@ -7,8 +7,9 @@ summary: how a long conversation stays under its target, when old results are tr
 ## What it is
 
 Every step resends the whole conversation. tofu measures each request
-against a target, 80% of the usable window and never more than 200,000
-tokens, and against a ceiling, 250,000 tokens at most. Two things keep a
+against a target, 80% of the usable window and never more than 360,000
+tokens, and against a ceiling, 450,000 tokens at most, the `contextCeiling`
+setting. Two things keep a
 conversation under them, both in the loop rather than in the model:
 
 - The trim shrinks tool results the model has already read to an
@@ -49,6 +50,10 @@ the carry names from any of them.
 - One run with a different ceiling: set `TOFU_CONTEXT_CEILING`, for
   example `TOFU_CONTEXT_CEILING=100000 tofu`. The target follows at 80% of
   it, 80,000 here.
+- Every run with a different cap: `tofu settings set contextCeiling 250000`
+  brings back the 250,000 cap of 0.5.12 and earlier from the next turn. A
+  model whose window is smaller still stops at its window less the
+  answer's reserve, and `TOFU_CONTEXT_CEILING` wins over the setting.
 - Free room before the next turn: type `/compact` in the app. Every old
   tool result is shrunk to its handle at once, with no model call, and the
   shrunk history becomes a new session.
@@ -66,7 +71,7 @@ tofu context
 ```
 
 prints how full the session is, band by band, against the target and the
-ceiling.
+ceiling. With no session yet, it prints the ceiling the next turn takes.
 
 ```
 tofu session trace <name>
@@ -86,4 +91,5 @@ model fetches it back when it needs it. A fork leaves the earlier
 generation whole in the session store, and `tofu session trace <id>`
 reads it by the id the fork's list change names. Unset
 `TOFU_CONTEXT_CEILING` to go back to the ceiling taken from the model's
-window.
+window, and `tofu settings set contextCeiling 450000` puts the default cap
+back.

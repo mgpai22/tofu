@@ -535,7 +535,7 @@ func TestRunHelpKeepsTheCeilingFlagWorkingAndDoesNotOfferIt(t *testing.T) {
 }
 
 func TestARequestOverTheModelsWindowIsRefusedBeforeItIsSent(t *testing.T) {
-	budget, err := recall.BudgetFor("a model with a small window", 1000)
+	budget, err := recall.BudgetUnder("a model with a small window", 1000, konst.ContextCeilingTokens)
 	if err != nil {
 		t.Fatalf("budget: %v", err)
 	}

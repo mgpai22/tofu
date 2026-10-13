@@ -98,6 +98,7 @@ func serveVerb(args []string, in io.Reader, out, errOut io.Writer) int {
 			return serveFail(errOut, err)
 		}
 	}
+	collectForALongLife()
 	dir, err := os.Getwd()
 	if err != nil {
 		return serveFail(errOut, err)

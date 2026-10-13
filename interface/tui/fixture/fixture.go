@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"tofu/interface/tui/frame"
-	"tofu/internal/konst"
 )
 
 const (
@@ -20,11 +19,13 @@ const (
 	Task        = "why does the gate read the policy first?"
 	Width       = 100
 	Height      = 30
+
+	ContextBudget = 250000
 )
 
 func Opened() time.Time { return time.Date(2026, 9, 19, 14, 32, 0, 0, time.UTC) }
 
-func Context() frame.Context { return frame.Context{Used: 118000, Budget: konst.ContextCeilingTokens} }
+func Context() frame.Context { return frame.Context{Used: 118000, Budget: ContextBudget} }
 
 func RiskLevels() []string {
 	return []string{

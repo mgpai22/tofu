@@ -29,9 +29,9 @@ func TestEstimateCountsFromTheLastReportAndOnlyEstimatesWhatCameAfter(t *testing
 	added := cfg.MessageTokens(strings.Repeat("b", 6000))
 	reported := 50000
 
-	budget, err := recall.BudgetFor("m1", 0)
+	budget, err := recall.BudgetUnder("m1", 0, konst.ContextCeilingTokens)
 	if err != nil {
-		t.Fatalf("BudgetFor: %v", err)
+		t.Fatalf("BudgetUnder: %v", err)
 	}
 	measured := func(c recall.Conversation) recall.Occupancy { return recall.Measure(cfg, budget.Bands, c) }
 	unanchored := budget.Sending(cfg, schemas)
@@ -94,9 +94,9 @@ func TestEstimateForksFromTheModelsWindowAndKeepsTheCeilingWithoutOne(t *testing
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Setenv(recall.CeilingVariable, c.ceiling)
-			budget, err := recall.BudgetFor("m1", c.window)
+			budget, err := recall.BudgetUnder("m1", c.window, konst.ContextCeilingTokens)
 			if err != nil {
-				t.Fatalf("BudgetFor: %v", err)
+				t.Fatalf("BudgetUnder: %v", err)
 			}
 			if budget.CeilingTokens != c.cap || budget.Bands.Target() != c.target {
 				t.Fatalf("ceiling %d and target %d, want %d and %d", budget.CeilingTokens, budget.Bands.Target(), c.cap, c.target)

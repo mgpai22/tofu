@@ -6,12 +6,12 @@
   › Appearance    05     Theme                                          esc                         
     Models & rol… 02     tofu uses Zed Nu Disco; choose a palette                                   
     Interaction   07                                                             comfortable  ▾     
-    Context       14     >  tofu                                                                    
+    Context       15     >  tofu                                                                    
     Files         03                                                                                
     Shell         05       tofu light                                                 subtle  ▾     
     Turn          15                                                                                
     Projects      04       tofu dusk                                                                
-    Browser       06                                                                 compact  ▾     
+    Browser       08                                                                 compact  ▾     
                            Solarized Light                                                          
   NAVIGATE                                                                                          
   ↑↓ setting · ←→          Dracula                                                      auto  ▾     

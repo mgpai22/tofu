@@ -3,12 +3,12 @@ exit 0
 Context · store-walk · 1 step                                           ✓ step 1
 
   task         explain the session store
-  identity     ▓▓▓░░░░░░░░░  27%  3300 / 12000
-  facts        ▓▓▓▓▓░░░░░░░  40%  1200 / 3000
-  working set  ▓▓▓▓▓▓░░░░░░  50%  9000 / 18000
-  recent       ▓▓░░░░░░░░░░  13%  4000 / 30000
-  total        ▓▓▓░░░░░░░░░  27%  17500 / 63000
-  ceiling      ▓░░░░░░░░░░░   7%  17500 / 250000
+  identity     ▓▓░░░░░░░░░░  15%  3300 / 21600
+  facts        ▓▓▓░░░░░░░░░  22%  1200 / 5400
+  working set  ▓▓▓░░░░░░░░░  27%  9000 / 32400
+  recent       ▓░░░░░░░░░░░   7%  4000 / 54000
+  total        ▓▓░░░░░░░░░░  15%  17500 / 113400
+  ceiling      ░░░░░░░░░░░░   3%  17500 / 450000
   caps         this build's, the step marked 50000
   bytes        2310 per thousand tokens
 

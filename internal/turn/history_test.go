@@ -209,7 +209,7 @@ func TestAnActThatListsOnlyChangesShrinksToThePageItActedOnAndErrorsStayWhole(t 
 	if err != nil {
 		t.Fatal(err)
 	}
-	budget, err := recall.BudgetFor("m1", 0)
+	budget, err := recall.BudgetUnder("m1", 0, konst.ContextCeilingTokens)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +333,7 @@ func TestForkAtTheDefaultCeilingRecordsTheCountThatDecidedAndKeepsANewestStepOve
 	table := strings.Repeat("0001 func parser(lexer token) window { return budget.carry(1) }\n", 480)
 	messages := slices.Concat(
 		[]llm.Message{{Role: llm.RoleSystem, Content: "you are tofu"}, {Role: llm.RoleUser, Content: "read the tables"}},
-		forkStep("old", strings.Repeat(table, 15)),
+		forkStep("old", strings.Repeat(table, budget.Bands.Target()/cfg.Tokens(table)+1)),
 		forkStep("read two generated tables at once", table, table))
 	newest := HistoryTokens(cfg, messages[len(messages)-3:])
 	if newest <= konst.ForkTailTokens {

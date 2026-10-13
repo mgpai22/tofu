@@ -60,7 +60,15 @@ func main() {
 	note := flag.String("note", "", "what changed in this pass")
 	runs := flag.Int("n", 7, "runs per command")
 	modfile := flag.String("modfile", "", "build against this go.mod instead of the tree's, to measure an earlier dependency set")
+	renderOnly := flag.Bool("render", false, "rewrite passes.md from the recorded passes and measured.json without running a pass")
 	flag.Parse()
+	if *renderOnly {
+		if err := render(); err != nil {
+			fmt.Fprintln(os.Stderr, "bench/cli:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if *name == "" {
 		fmt.Fprintln(os.Stderr, "bench/cli: -pass is required")
 		os.Exit(2)

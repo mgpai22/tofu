@@ -1,6 +1,6 @@
 exit 0
 --- stdout
-Settings · 2 set                                                     59 declared
+Settings · 2 set                                                     60 declared
 
 Appearance
   ● theme                   Nord                                  project
@@ -23,6 +23,7 @@ Context
     thinkingSummary         summarized                            default
     images                  auto                                  default
     projectInstructionsCap  32768                                 default
+    contextCeiling          450000                                default
     instructionSources      agents-first                          default
     skills                  on                                    default
     memory                  true                                  default

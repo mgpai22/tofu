@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"tofu/bench/corpus"
+	"tofu/internal/konst"
 	rc "tofu/internal/recall"
 	"tofu/internal/sys"
 )
@@ -60,7 +61,7 @@ func checkpointCases(t *testing.T) []checkpointCase {
 func caseBands(t *testing.T, target int) rc.Bands {
 	t.Helper()
 	t.Setenv(rc.CeilingVariable, strconv.Itoa(target))
-	budget, err := rc.BudgetFor(replayedModel, replayedModelWindow)
+	budget, err := rc.BudgetUnder(replayedModel, replayedModelWindow, konst.ContextCeilingTokens)
 	if err != nil {
 		t.Fatalf("budget at %d: %v", target, err)
 	}

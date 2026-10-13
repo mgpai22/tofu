@@ -6,12 +6,12 @@
   › Appearance    05      tofu uses Zed Nu Disco; choose a palette                                  
     Models & rol… 02                                                                                
     Interaction   07      Density                                                comfortable  ▾     
-    Context       14      Spacing across lists and panels                                           
+    Context       15      Spacing across lists and panels                                           
     Files         03                                                                                
     Shell         05      Animations                                                  subtle  ▾     
     Turn          15      Motion for conversational states                                          
     Projects      04                                                                                
-    Browser       06      Status bar                                                 compact  ▾     
+    Browser       08      Status bar                                                 compact  ▾     
                           Context, quotas, and runtime counters                                     
   NAVIGATE                                                                                          
   ↑↓ setting · ←→         Color mode                                                    auto  ▾     

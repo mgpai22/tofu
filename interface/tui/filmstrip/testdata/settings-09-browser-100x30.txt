@@ -6,12 +6,12 @@
     Appearance    05      drive lets the model read your Chrome tabs and click and type in them…    
     Models & rol… 02                                                                                
     Interaction   07      Browser driver                                            subagent  ▾     
-    Context       14      subagent gives the browser steps to a browser sub-agent on browserMod…    
+    Context       15      subagent gives the browser steps to a browser sub-agent on browserMod…    
     Files         03                                                                                
     Shell         05      Browser steps                                                   30  ▾     
     Turn          15      how many actions one browser task may take                                
     Projects      04                                                                                
-  › Browser       06      Browser model                                              default  ▾     
+  › Browser       08      Browser model                                              default  ▾     
                           the subscription model a browser task asks for the text to type and f…    
   NAVIGATE                                                                                          
   ↑↓ setting · ←→         Browser effort                                             default  ▾     
@@ -20,11 +20,11 @@
   esc chat                Browser cursor                                                    ● on    
                           a small cursor labelled tofu glides to each click in tofu's own tab, …    
                                                                                                     
+                          Browser profile                                            default  ▾     
+                          the browser profile tofu drives, from tofu browser profile new: tofu …    
+                                                                                                    
+                          Browser headless                                                  ● on    
+                          a Chrome tofu starts on a browser profile runs with no window; false …    
+                                                                                                    
                         enter change  ·  shift+tab scope  ·  esc chat                               
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
                                                                                                     

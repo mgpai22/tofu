@@ -57,6 +57,7 @@ const (
 	ThinkingSummary        = "thinkingSummary"
 	Images                 = "images"
 	ProjectInstructionsCap = "projectInstructionsCap"
+	ContextCeiling         = "contextCeiling"
 	InstructionSources     = "instructionSources"
 	Memory                 = "memory"
 	AutoMemory             = "autoMemory"
@@ -251,6 +252,8 @@ func Default() []Spec {
 			Choices: []string{ImagesAuto, ImagesInline, ImagesOff}},
 		{Key: ProjectInstructionsCap, Label: "Project instructions", Description: "bytes of your instruction files sent each turn", Category: "Context", Kind: Int, Default: konst.ProjectInstructionsBytesDefault,
 			Least: 1, Most: konst.ProjectInstructionsBytesMost, Unit: "bytes of AGENTS.md and CLAUDE.md sent each turn"},
+		{Key: ContextCeiling, Label: "Context ceiling", Description: "the most tokens one request may carry, and the conversation forks before it; a model whose window is smaller stops at its window less the answer's reserve. TOFU_CONTEXT_CEILING and --context-ceiling win over it, and the next turn reads the new value", Category: "Context", Kind: Int, Default: konst.ContextCeilingTokens,
+			Least: 1, Most: math.MaxInt32, Unit: "tokens a request may carry"},
 		{Key: InstructionSources, Label: "Instruction files", Description: "a folder with both AGENTS.md and CLAUDE.md sends one: agents-first sends AGENTS.md, claude-first sends CLAUDE.md, both sends both and costs more tokens. Read from the working directory up to its git root; the home directory gives only ~/.tofu/AGENTS.md", Category: "Context", Kind: Text, DefaultText: InstructionsAgentsFirst,
 			Choices: []string{InstructionsAgentsFirst, InstructionsClaudeFirst, InstructionsBoth},
 			Aliases: map[string]string{"AGENTS.md,CLAUDE.md": InstructionsAgentsFirst, "AGENTS.md": InstructionsAgentsFirst, "CLAUDE.md,AGENTS.md": InstructionsClaudeFirst, "CLAUDE.md": InstructionsClaudeFirst}},

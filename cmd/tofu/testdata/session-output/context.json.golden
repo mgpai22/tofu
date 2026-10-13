@@ -14,23 +14,23 @@ exit 0
       "step": 1,
       "identity": {
         "tokens": 3300,
-        "cap": 12000,
-        "fill_percent": 27
+        "cap": 21600,
+        "fill_percent": 15
       },
       "facts": {
         "tokens": 1200,
-        "cap": 3000,
-        "fill_percent": 40
+        "cap": 5400,
+        "fill_percent": 22
       },
       "working_set": {
         "tokens": 9000,
-        "cap": 18000,
-        "fill_percent": 50
+        "cap": 32400,
+        "fill_percent": 27
       },
       "recent": {
         "tokens": 4000,
-        "cap": 30000,
-        "fill_percent": 13
+        "cap": 54000,
+        "fill_percent": 7
       },
       "total": 17500,
       "mark": 50000,
@@ -42,7 +42,7 @@ exit 0
         "reason": "session: the header of turn-broken does not parse: invalid character 'n' looking for beginning of object key string"
       }
     ],
-    "ceiling": 250000,
+    "ceiling": 450000,
     "bytes_per_thousand_tokens": 2310
   },
   "problems": []

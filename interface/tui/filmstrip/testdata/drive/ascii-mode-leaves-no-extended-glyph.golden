@@ -186,12 +186,12 @@
   > Appearance    05      tofu uses Zed Nu Disco; choose a palette                                  
     Models & rol. 02                                                                                
     Interaction   07      Density                                                comfortable  v     
-    Context       14      Spacing across lists and panels                                           
+    Context       15      Spacing across lists and panels                                           
     Files         03                                                                                
     Shell         05      Animations                                                  subtle  v     
     Turn          15      Motion for conversational states                                          
     Projects      04                                                                                
-    Browser       06      Status bar                                                 compact  v     
+    Browser       08      Status bar                                                 compact  v     
                           Context, quotas, and runtime counters                                     
   NAVIGATE                                                                                          
   ^v setting . <>         Color mode                                                    auto  v     
@@ -216,12 +216,12 @@
   > Appearance    05     Theme                                          esc                         
     Models & rol. 02     tofu uses Zed Nu Disco; choose a palette                                   
     Interaction   07                                                             comfortable  v     
-    Context       14     >  tofu                                                                    
+    Context       15     >  tofu                                                                    
     Files         03                                                                                
     Shell         05       tofu light                                                 subtle  v     
     Turn          15                                                                                
     Projects      04       tofu dusk                                                                
-    Browser       06                                                                 compact  v     
+    Browser       08                                                                 compact  v     
                            Solarized Light                                                          
   NAVIGATE                                                                                          
   ^v setting . <>          Dracula                                                      auto  v     

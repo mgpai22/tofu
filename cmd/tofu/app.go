@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -233,11 +234,21 @@ func isTerminal(stream any) bool {
 	return isFile && term.IsTerminal(file.Fd())
 }
 
+func collectForALongLife() {
+	if os.Getenv("GOGC") == "" {
+		debug.SetGCPercent(konst.LongLivedGCPercent)
+	}
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(konst.LongLivedMemoryLimitBytes)
+	}
+}
+
 func appVerb(in io.Reader, out, errOut io.Writer, resumed sessionResume) int {
 	if !isTerminal(in) {
 		_, _ = fmt.Fprintln(errOut, noTerminal)
 		return exitUsage
 	}
+	collectForALongLife()
 	dir, err := os.Getwd()
 	if err != nil {
 		_, _ = fmt.Fprintf(errOut, "tofu: the working directory is unreadable: %v\n", err)

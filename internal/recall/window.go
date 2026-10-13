@@ -25,7 +25,7 @@ type Budget struct {
 	reportedAt    int
 }
 
-func BudgetFor(model string, windowTokens int) (Budget, error) {
+func BudgetUnder(model string, windowTokens, ceilingTokens int) (Budget, error) {
 	budget := Budget{Model: model, WindowTokens: windowTokens, Automatic: true}
 	if text := strings.TrimSpace(os.Getenv(CeilingVariable)); text != "" {
 		set, err := strconv.Atoi(text)
@@ -35,12 +35,13 @@ func BudgetFor(model string, windowTokens int) (Budget, error) {
 		return budget.At(set, fmt.Sprintf("%s=%d in the environment of this run", CeilingVariable, set)), nil
 	}
 	if windowTokens <= konst.ContextOutputReserveTokens {
-		budget.CeilingTokens, budget.Bands, budget.Source = konst.ContextCeilingTokens, ShippedBands(), "the ceiling tofu operates under, which is ours and the same on every model"
+		budget.CeilingTokens, budget.Bands = ceilingTokens, BandsOf(ceilingTokens)
+		budget.Source = fmt.Sprintf("the %d token ceiling tofu operates under, which is ours and the same on every model", ceilingTokens)
 		return budget, nil
 	}
-	usable := min(windowTokens-konst.ContextOutputReserveTokens, konst.ContextCeilingTokens)
+	usable := min(windowTokens-konst.ContextOutputReserveTokens, ceilingTokens)
 	return budget.At(usable, fmt.Sprintf("the model's window less %d tokens held for the answer, and never over tofu's own %d",
-		konst.ContextOutputReserveTokens, konst.ContextCeilingTokens)), nil
+		konst.ContextOutputReserveTokens, ceilingTokens)), nil
 }
 
 func (b Budget) At(ceilingTokens int, source string) Budget {

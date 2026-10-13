@@ -425,7 +425,7 @@ func contextBudget(opts runOpts, model models.Model) (recall.Budget, error) {
 		return recall.Budget{}, err
 	}
 	windowTokens, windowSource := models.WindowFor(model, registry, models.Served{})
-	budget, err := recall.BudgetFor(model.ID, windowTokens)
+	budget, err := recall.BudgetUnder(model.ID, windowTokens, settingInt(opts.dir, settingspkg.ContextCeiling, nil))
 	if err != nil {
 		return recall.Budget{}, err
 	}

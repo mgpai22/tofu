@@ -6,12 +6,12 @@
     Appearance    05      a running shell outlives tofu and the next launch lists it; off stops…    
     Models & rol… 02                                                                                
     Interaction   07      Log tail                                                       500  ▾     
-    Context       14      Lines retained per shell                                                  
+    Context       15      Lines retained per shell                                                  
     Files         03                                                                                
   › Shell         05      Kill confirm                                                      ● on    
     Turn          15      Confirm process termination                                               
     Projects      04                                                                                
-    Browser       06      Shell                                                      default  ▾     
+    Browser       08      Shell                                                      default  ▾     
                           a path, or the word wsl; empty resolves the person's own shell automa…    
   NAVIGATE                                                                                          
   ↑↓ setting · ←→         Fold hides shell                                                 ○ off    

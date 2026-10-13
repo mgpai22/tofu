@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"tofu/internal/konst"
 	rc "tofu/internal/recall"
 	"tofu/internal/session"
 	"tofu/internal/turn"
@@ -23,7 +24,7 @@ func budgetAt(t *testing.T, ceiling int) rc.Budget {
 	if ceiling > 0 {
 		t.Setenv(rc.CeilingVariable, strconv.Itoa(ceiling))
 	}
-	budget, err := rc.BudgetFor(replayedModel, replayedModelWindow)
+	budget, err := rc.BudgetUnder(replayedModel, replayedModelWindow, konst.ContextCeilingTokens)
 	if err != nil {
 		t.Fatalf("budget for %s: %v", replayedModel, err)
 	}

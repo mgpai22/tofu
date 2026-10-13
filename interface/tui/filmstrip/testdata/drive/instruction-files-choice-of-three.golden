@@ -2,17 +2,17 @@
   tofu settings         Context                                         global scope (shift+tab)    
   Global preferences    Choose a row to inspect and change its value.                               
                                                                                                     
-  CATEGORIES              Thinking                                                          ● on    
-    Appearance    05      thinking shows in each agent's sub-agents feed; t there toggles it        
+  CATEGORIES              Thinking summary                                        summarized  ▾     
+    Appearance    05      summarized asks Claude for a summary of its thinking; omitted asks fo…    
     Models & rol… 02                                                                                
-    Interaction   07      Thinking summary                                        summarized  ▾     
-  › Context       14      summarized asks Claude for a summary of its thinking; omitted asks fo…    
+    Interaction   07      Images                                                        auto  ▾     
+  › Context       15      auto sends a pasted image only to a model that can see, inline always…    
     Files         03                                                                                
-    Shell         05      Images                                                        auto  ▾     
-    Turn          15      auto sends a pasted image only to a model that can see, inline always…    
+    Shell         05      Project instructions                                         32768  ▾     
+    Turn          15      bytes of your instruction files sent each turn                            
     Projects      04                                                                                
-    Browser       06      Project instructions                                         32768  ▾     
-                          bytes of your instruction files sent each turn                            
+    Browser       08      Context ceiling                                             450000  ▾     
+                          the most tokens one request may carry, and the conversation forks bef…    
   NAVIGATE                                                                                          
   ↑↓ setting · ←→       › Instruction files                                     claude-first  ▾     
   section                 a folder with both AGENTS.md and CLAUDE.md sends one: agents-first se…    
@@ -32,17 +32,17 @@
   tofu settings         Context                                         global scope (shift+tab)    
   Global preferences    Choose a row to inspect and change its value.                               
                                                                                                     
-  CATEGORIES              Thinking                                                          ● on    
-    Appearance    05      thinking shows in each agent's sub-agents feed; t there toggles it        
+  CATEGORIES              Thinking summary                                        summarized  ▾     
+    Appearance    05      summarized asks Claude for a summary of its thinking; omitted asks fo…    
     Models & rol… 02                                                                                
-    Interaction   07     Instruction files                              esc       summarized  ▾     
-  › Context       14     a folder with both AGENTS.md and CLAUDE.md sends    g; omitted asks fo…    
+    Interaction   07     Instruction files                              esc             auto  ▾     
+  › Context       15     a folder with both AGENTS.md and CLAUDE.md sends    see, inline always…    
     Files         03     one: agents-first sends AGENTS.md, claude-first                            
-    Shell         05     sends CLAUDE.md, both sends both and costs more                auto  ▾     
-    Turn          15     tokens. Read from the working directory up to its   see, inline always…    
+    Shell         05     sends CLAUDE.md, both sends both and costs more               32768  ▾     
+    Turn          15     tokens. Read from the working directory up to its                          
     Projects      04     git root; the home directory gives only                                    
-    Browser       06     ~/.tofu/AGENTS.md                                             32768  ▾     
-                                                                                                    
+    Browser       08     ~/.tofu/AGENTS.md                                            450000  ▾     
+                                                                             ersation forks bef…    
   NAVIGATE                 agents-first                                                             
   ↑↓ setting · ←→                                                               claude-first  ▾     
   section                >  claude-first                                     e: agents-first se…    
@@ -62,17 +62,17 @@
   tofu settings         Context                                         global scope (shift+tab)    
   Global preferences    Choose a row to inspect and change its value.                               
                                                                                                     
-  CATEGORIES              Thinking                                                          ● on    
-    Appearance    05      thinking shows in each agent's sub-agents feed; t there toggles it        
+  CATEGORIES              Thinking summary                                        summarized  ▾     
+    Appearance    05      summarized asks Claude for a summary of its thinking; omitted asks fo…    
     Models & rol… 02                                                                                
-    Interaction   07     Instruction files                              esc       summarized  ▾     
-  › Context       14     a folder with both AGENTS.md and CLAUDE.md sends    g; omitted asks fo…    
+    Interaction   07     Instruction files                              esc             auto  ▾     
+  › Context       15     a folder with both AGENTS.md and CLAUDE.md sends    see, inline always…    
     Files         03     one: agents-first sends AGENTS.md, claude-first                            
-    Shell         05     sends CLAUDE.md, both sends both and costs more                auto  ▾     
-    Turn          15     tokens. Read from the working directory up to its   see, inline always…    
+    Shell         05     sends CLAUDE.md, both sends both and costs more               32768  ▾     
+    Turn          15     tokens. Read from the working directory up to its                          
     Projects      04     git root; the home directory gives only                                    
-    Browser       06     ~/.tofu/AGENTS.md                                             32768  ▾     
-                                                                                                    
+    Browser       08     ~/.tofu/AGENTS.md                                            450000  ▾     
+                                                                             ersation forks bef…    
   NAVIGATE                 agents-first                                                             
   ↑↓ setting · ←→                                                                       both  ▾     
   section                  claude-first                                      e: agents-first se…    

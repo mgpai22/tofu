@@ -8,7 +8,7 @@ updated: 2026-10-12
 A setting is a named switch with a default, like `gatePrompt` or
 `subAgentsPerTurn`. You write only the ones you change, in
 `~/.tofu/settings.json` for every project or `.tofu/settings.json` for one.
-The project wins over yours, and yours over the default. 57 settings sit in
+The project wins over yours, and yours over the default. 60 settings sit in
 eight groups: Appearance, Interaction, Context, Files, Shell, Turn, Projects
 and Browser. Projects holds boardy, the ticket board, and the scratchpad.
 

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -58,9 +59,32 @@ func render() error {
 			fmt.Fprintf(&page, "| `%s` | %.1f | %.1f | %.2fx | %.1f | %.1f | %.1f | %.1f | %.1f |\n", r.Command, v0.CPUMs, r.CPUMs, v0.CPUMs/r.CPUMs, v0.WallMs, r.WallMs, r.WallP90Ms, v0.RSSMB, r.RSSMB)
 		}
 	}
+	measured, err := os.ReadFile(filepath.Join(benchDir, "measured.json"))
+	if err != nil {
+		return err
+	}
+	var measures []measure
+	if err := json.Unmarshal(measured, &measures); err != nil {
+		return fmt.Errorf("measured.json: %w", err)
+	}
+	page.WriteString("\n## Outside the verbs\n\nChanges a verb timing cannot see, each measured by the command named in its row, before and after, on the same machine. The ratio is before over after where less is better and after over before where more is, so above 1x is a gain and below it a cost.\n\n| pass | change | measure | before | after | ratio | commit | measured by |\n|---|---|---|---|---|---|---|---|\n")
+	for _, m := range measures {
+		gain := m.Before / m.After
+		if m.MoreIsBetter {
+			gain = 1 / gain
+		}
+		fmt.Fprintf(&page, "| %s | %s | %s | %s | %s | %.2fx | %s | `%s` |\n", m.Pass, m.Change, m.Measure,
+			strconv.FormatFloat(m.Before, 'f', -1, 64), strconv.FormatFloat(m.After, 'f', -1, 64), gain, m.Commit, m.Command)
+	}
 	page.WriteString("\n## v0\n\n| command | CPU ms | wall ms | wall p90 ms | RSS MB |\n|---|---|---|---|---|\n")
 	for _, r := range passes[base].Rows {
 		fmt.Fprintf(&page, "| `%s` | %.1f | %.1f | %.1f | %.1f |\n", r.Command, r.CPUMs, r.WallMs, r.WallP90Ms, r.RSSMB)
 	}
 	return os.WriteFile(filepath.Join(benchDir, "passes.md"), []byte(page.String()), 0o644)
+}
+
+type measure struct {
+	Pass, Change, Measure, Commit, Command string
+	Before, After                          float64
+	MoreIsBetter                           bool
 }

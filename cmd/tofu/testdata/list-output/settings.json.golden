@@ -213,6 +213,17 @@ exit 0
         "unit": "bytes of AGENTS.md and CLAUDE.md sent each turn"
       },
       {
+        "key": "contextCeiling",
+        "category": "Context",
+        "value": 450000,
+        "source": "default",
+        "label": "Context ceiling",
+        "description": "the most tokens one request may carry, and the conversation forks before it; a model whose window is smaller stops at its window less the answer's reserve. TOFU_CONTEXT_CEILING and --context-ceiling win over it, and the next turn reads the new value",
+        "kind": "int",
+        "min": 1,
+        "unit": "tokens a request may carry"
+      },
+      {
         "key": "instructionSources",
         "category": "Context",
         "value": "agents-first",

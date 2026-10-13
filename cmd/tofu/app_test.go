@@ -762,7 +762,7 @@ func TestATurnDrivenThroughTheAppFillsTheContextMeter(t *testing.T) {
 	if strings.Contains(screen, "context unread") {
 		t.Errorf("the bar still says context unread:\n%s", screen)
 	}
-	if !strings.Contains(screen, "/250k") {
+	if !strings.Contains(screen, "/"+strconv.Itoa(konst.ContextCeilingTokens/1000)+"k") {
 		t.Errorf("the bar does not show what is carried against the budget:\n%s", screen)
 	}
 	t.Logf("context events %d, first %+v", len(carried), first)

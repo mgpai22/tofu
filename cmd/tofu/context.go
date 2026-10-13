@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 
 	"tofu/interface/cli"
 	"tofu/internal/host"
-	"tofu/internal/konst"
 	"tofu/internal/recall"
 	"tofu/internal/session"
+	settingspkg "tofu/internal/settings"
 	"tofu/internal/turn"
 )
 
@@ -42,10 +43,15 @@ func contextVerb(args []string, out, errOut io.Writer) int {
 	if len(handles) == 1 {
 		handle = handles[0]
 	}
-	store, err := session.Open()
+	dir, _ := os.Getwd()
+	next, err := recall.BudgetUnder("", 0, settingInt(dir, settingspkg.ContextCeiling, nil))
+	var store *session.Store
+	if err == nil {
+		store, err = session.Open()
+	}
 	var report contextReport
 	if err == nil {
-		report, err = contextOf(store, handle, recall.ShippedBands())
+		report, err = contextOf(store, handle, recall.ShippedBands(), next.CeilingTokens)
 	}
 	if err != nil {
 		return o.fail(err)
@@ -53,7 +59,7 @@ func contextVerb(args []string, out, errOut io.Writer) int {
 	return o.done(true, report, func(page cli.Page) []string { return contextLines(page, report) })
 }
 
-func contextOf(store *session.Store, handle string, build recall.Bands) (contextReport, error) {
+func contextOf(store *session.Store, handle string, build recall.Bands, nextCeiling int) (contextReport, error) {
 	var skipped []sessionSkip
 	if handle == "" {
 		listing, err := store.Listing()
@@ -68,7 +74,7 @@ func contextOf(store *session.Store, handle string, build recall.Bands) (context
 			if len(skipped) > 0 {
 				absence = contextNoneReadable
 			}
-			return contextReport{Unmeasured: absence, Skipped: skipped}, nil
+			return contextReport{Unmeasured: absence, Skipped: skipped, Ceiling: nextCeiling}, nil
 		}
 		handle = listing.Sessions[0].ID
 	}
@@ -93,7 +99,7 @@ func contextOf(store *session.Store, handle string, build recall.Bands) (context
 		Task:                   header.Task,
 		Steps:                  len(steps),
 		Unmeasured:             contextNeverMeasured,
-		Ceiling:                cmp.Or(header.ContextCeiling, konst.ContextCeilingTokens),
+		Ceiling:                cmp.Or(header.ContextCeiling, nextCeiling),
 		BytesPerThousandTokens: cfg.BytesPerThousandTokens,
 		Skipped:                skipped,
 	}
@@ -163,7 +169,10 @@ func contextLines(page cli.Page, r contextReport) []string {
 		if len(r.Skipped) > 0 {
 			mark = cli.Fail
 		}
-		return append(page.Title("Context", nil, cli.Verdict{Mark: mark, Text: r.Unmeasured}), skippedLines(page, r.Skipped)...)
+		ceiling := cli.Fact{Label: "ceiling", Text: strconv.Itoa(r.Ceiling) + " tokens, the most the next turn sends"}
+		lines := append(page.Title("Context", nil, cli.Verdict{Mark: mark, Text: r.Unmeasured}), "")
+		lines = append(lines, cli.Indent(page.Facts([]cli.Fact{ceiling})...)...)
+		return append(lines, skippedLines(page, r.Skipped)...)
 	}
 	verdict := cli.Verdict{Mark: cli.Idle, Text: "not measured"}
 	facts := []cli.Fact{{Label: "task", Text: oneLine(r.Task)}}

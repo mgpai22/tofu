@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"tofu/internal/konst"
 	"tofu/internal/llm"
 	"tofu/internal/recall"
 )
@@ -14,7 +15,7 @@ func TestAForkKeepsTheImageOfTheTaskItCarriesAndNoOther(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	budget, err := recall.BudgetFor("m1", 0)
+	budget, err := recall.BudgetUnder("m1", 0, konst.ContextCeilingTokens)
 	if err != nil {
 		t.Fatal(err)
 	}

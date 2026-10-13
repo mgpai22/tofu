@@ -69,7 +69,7 @@ func readStep(step int) llm.Decision {
 func forkingConfig(t *testing.T, model Model, bytes map[string]int, ceiling string) (Config, *[]StepRow) {
 	t.Helper()
 	t.Setenv(recall.CeilingVariable, ceiling)
-	budget, err := recall.BudgetFor("m1", 0)
+	budget, err := recall.BudgetUnder("m1", 0, konst.ContextCeilingTokens)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,7 +331,7 @@ func TestAPictureAToolReadsReachesTheModelCountsAndIsTheFirstThingDropped(t *tes
 		[]llm.Message{{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{{ID: "t1", Name: "read", Arguments: json.RawMessage(`{"path":"a.go"}`)}}},
 			{Role: llm.RoleTool, ToolCallID: "t1", Content: text}, {Role: llm.RoleAssistant, Content: "read them"}})
 	withPictures := HistoryTokens(artifacts.preview, messages)
-	budget, err := recall.BudgetFor("m1", 0)
+	budget, err := recall.BudgetUnder("m1", 0, konst.ContextCeilingTokens)
 	if err != nil {
 		t.Fatal(err)
 	}

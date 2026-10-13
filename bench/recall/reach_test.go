@@ -22,7 +22,6 @@ func TestNoRecordedSessionHasEverCrossedTheCeiling(t *testing.T) {
 	if len(reach.Measured) == 0 {
 		t.Skip("no session on this machine carries occupancy: nothing to measure")
 	}
-	const ceiling = 250000
 	if reach.Highest() >= ceiling {
 		t.Fatalf("a recorded session peaked at %d, at or over the %d ceiling", reach.Highest(), ceiling)
 	}

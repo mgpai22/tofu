@@ -98,6 +98,22 @@ CPU is QueryProcessCycleTime at a cycle rate calibrated by spinning one locked t
 | `logout` | 90.7 | 44.6 | 2.03x | 87.6 | 46.5 | 60.2 | 25.8 | 18.3 |
 | `login --status` | 123.0 | 61.2 | 2.01x | 118.8 | 63.4 | 72.0 | 26.3 | 19.2 |
 
+## Outside the verbs
+
+Changes a verb timing cannot see, each measured by the command named in its row, before and after, on the same machine. The ratio is before over after where less is better and after over before where more is, so above 1x is a gain and below it a cost.
+
+| pass | change | measure | before | after | ratio | commit | measured by |
+|---|---|---|---|---|---|---|---|
+| v2-ceiling | konst.ContextCeilingTokens 250000 to 450000, contextCeiling setting to go back | tokens before the first fork on a 1M window model | 200000 | 360000 | 1.80x | f347e62d dirty | `tofu run --dir . --dry-run --model claude-sub/claude-opus-5 hi` |
+| v2-gogc | GOGC 200 and a 512 MiB soft memory limit in tofu app and tofu serve | GC CPU ms over the long-session TUI test, median of 3 | 219.3 | 102.1 | 2.15x | f347e62d dirty | `GODEBUG=gctrace=1 GOGC=100, then GOGC=200 GOMEMLIMIT=512MiB, tui.test -test.run TestLongSessionFramesStayInsideTheBudget` |
+| v2-gogc | GOGC 200 and a 512 MiB soft memory limit in tofu app and tofu serve | GC cycles over the long-session TUI test, median of 3 | 94 | 42 | 2.24x | f347e62d dirty | `GODEBUG=gctrace=1 GOGC=100, then GOGC=200 GOMEMLIMIT=512MiB, tui.test -test.run TestLongSessionFramesStayInsideTheBudget` |
+| v2-gogc | GOGC 200 and a 512 MiB soft memory limit in tofu app and tofu serve | frame median ms, sub-agents thinking streams, median of 3 | 5.21 | 5.19 | 1.00x | f347e62d dirty | `GOGC=100, then GOGC=200 GOMEMLIMIT=512MiB, tui.test -test.run TestLongSessionFramesStayInsideTheBudget` |
+| v2-gogc | GOGC 200 and a 512 MiB soft memory limit in tofu app and tofu serve | frame median ms, file edits next and previous, median of 3 | 6.03 | 5.62 | 1.07x | f347e62d dirty | `GOGC=100, then GOGC=200 GOMEMLIMIT=512MiB, tui.test -test.run TestLongSessionFramesStayInsideTheBudget` |
+| v2-gogc | GOGC 200 and a 512 MiB soft memory limit in tofu app and tofu serve | KB allocated a frame, sub-agents thinking streams, median of 3 | 1324 | 1308.7 | 1.01x | f347e62d dirty | `GOGC=100, then GOGC=200 GOMEMLIMIT=512MiB, tui.test -test.run TestLongSessionFramesStayInsideTheBudget` |
+| v2-gogc | GOGC 200 and a 512 MiB soft memory limit in tofu app and tofu serve | peak heap MB over the long-session TUI test, median of 3 | 21 | 29 | 0.72x | f347e62d dirty | `GODEBUG=gctrace=1 GOGC=100, then GOGC=200 GOMEMLIMIT=512MiB, tui.test -test.run TestLongSessionFramesStayInsideTheBudget` |
+| v2-pool | a sync.Pool request body buffer in the anthropic wire, dropped | bytes allocated per Encode of a 1419957 byte request, median of 5 | 2706804 | 3570784 | 0.76x | f347e62d dirty | `go test -run ^$ -bench EncodeALongConversation -count 5 ./internal/llm/wire/anthropic/` |
+| v2-pool | a sync.Pool request body buffer in the anthropic wire, dropped | ns per Encode of a 1419957 byte request, median of 5 | 2135443 | 2256672 | 0.95x | f347e62d dirty | `go test -run ^$ -bench EncodeALongConversation -count 5 ./internal/llm/wire/anthropic/` |
+
 ## v0
 
 | command | CPU ms | wall ms | wall p90 ms | RSS MB |

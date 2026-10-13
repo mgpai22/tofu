@@ -19,7 +19,7 @@ const (
 )
 
 const (
-	ContextCeilingTokens       = 250000
+	ContextCeilingTokens       = 450000
 	ContextOutputReserveTokens = 20000
 	ContextForkPercentOfUsable = 80
 
@@ -116,6 +116,11 @@ const (
 	RewrapFillEntries = 4
 	RewrapKeptWidths  = 4
 	RewrapFillMillis  = 30
+)
+
+const (
+	LongLivedGCPercent        = 200
+	LongLivedMemoryLimitBytes = 512 * 1024 * 1024
 )
 
 const (

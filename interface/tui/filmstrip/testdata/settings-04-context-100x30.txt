@@ -6,12 +6,12 @@
     Appearance    05      chat shows every tool call                                                
     Models & rol… 02                                                                                
     Interaction   07      Agent feeds                                                   full  ▾     
-  › Context       14      full keeps every sub-agents event, summary the latest 200, off shows …    
+  › Context       15      full keeps every sub-agents event, summary the latest 200, off shows …    
     Files         03                                                                                
     Shell         05      Thinking                                                          ● on    
     Turn          15      thinking shows in each agent's sub-agents feed; t there toggles it        
     Projects      04                                                                                
-    Browser       06      Thinking summary                                        summarized  ▾     
+    Browser       08      Thinking summary                                        summarized  ▾     
                           summarized asks Claude for a summary of its thinking; omitted asks fo…    
   NAVIGATE                                                                                          
   ↑↓ setting · ←→         Images                                                        auto  ▾     
@@ -20,11 +20,11 @@
   esc chat                Project instructions                                         32768  ▾     
                           bytes of your instruction files sent each turn                            
                                                                                                     
+                          Context ceiling                                             450000  ▾     
+                          the most tokens one request may carry, and the conversation forks bef…    
+                                                                                                    
                           Instruction files                                     agents-first  ▾     
                           a folder with both AGENTS.md and CLAUDE.md sends one: agents-first se…    
-                                                                                                    
-                          Skills                                                            ● on    
-                          on lists the skills in .tofu, .agents and .claude skill folders to th…    
                                                                                                     
                         enter change  ·  shift+tab scope  ·  esc chat                               
                                                                                                     
