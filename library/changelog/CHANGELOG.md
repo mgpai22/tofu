@@ -10,6 +10,26 @@ The minor number carries breaking changes, which is what 0.x means, and **there 
 
 ## Unreleased
 
+## 0.5.14 - 2026-10-13
+
+A lead that never freezes, an auto mode that asks only when it matters, and tofu ahead of Claude Code on the same task.
+
+### Fixed
+
+- A reply that starts several sub-agents no longer freezes the lead when a hook refuses one of them: the refused one shows its refusal and the others start. Esc while a turn is stopping sends your queued message and stops the lead; if the stop is still pending a few seconds later, Esc stops everything, and Ctrl+C then quits.
+- A sub-agent's chip shows its real name after `tofu --continue`.
+- A sub-agent resumed by a message keeps running when you press Esc.
+
+### Changed
+
+- Auto mode asks you only for what is destructive, outside the project or facing out. Reads, `--help`, a `/dev/null` redirect and a nested fixture's settings no longer ask; a sub-agent's work inside its own paths no longer goes to the lead; a choice the ask judge approves and marks reversible is taken without asking. A headless `tofu run` runs a call the gate asks about and still refuses a deny or a gate that could not answer.
+- A sub-agent's checks on its own files are never refused: `gofmt`, `rustfmt`, `cargo build`, `rtk read`, `${PIPESTATUS[n]}` and a `CARGO_TARGET_DIR=` prefix are allowed on owned paths, a command is tree-wide only when it reaches a folder the agent does not hold, and its own scratch folder is recognised in `/c/...` spelling.
+- The lead does a small task in one folder itself instead of spawning and re-reading, and answers from a clean sub-agent report. On the same Go task with Sonnet 5.5, tofu now takes 5 requests, 112k input tokens and 48 s, against Claude Code's 6, 151k and 50 s (`bench/rivals`).
+- A program's own output written to a file, such as `tofu serve --schema > schema.json`, is no longer refused as hand-written source.
+- The board rules and ticket tools load only when the project has a board.
+- `tofu run --model codex-sub/...` takes the codex wire without `--wire`, prints totals that include sub-agents, and a failing test's trace reason names the failure.
+- Each step costs less: tofu's own CPU on the benchmark task fell from 2.4 s to 1.3 s and its allocation from 145 MB to 67 MB, with 7 `git` processes a task where it took 18. `TOFU_PPROF=<dir>` writes CPU and heap profiles.
+
 ## 0.5.13-fix1 - 2026-10-13
 
 A sub-agent's plan stays its own.

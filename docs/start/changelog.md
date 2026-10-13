@@ -99,6 +99,14 @@ per language.
   [Orchestration](/docs/features/orchestration).
 - **Sub-tickets and threads** in Boardy, and `tofu learn` names the jobs you
   repeat and what each costs.
+- **Ahead on the same task**: on a Go task with Sonnet 5.5, tofu takes 5
+  requests and 112k input tokens where Claude Code takes 6 and 151k, at
+  the same quality, with the least memory of the tools measured.
+- **Auto mode that asks only when it matters**: reads, help and work inside
+  an agent's own paths run; what is destructive or leaves the project asks.
+  See [Asking](/docs/features/asking).
+- **A lead that never freezes**: a refused sub-agent no longer stops the
+  others, and Esc or Ctrl+C always ends a turn.
 
 ## 0.4
 
