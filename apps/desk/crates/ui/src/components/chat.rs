@@ -512,7 +512,8 @@ impl Reader<'_> {
     }
 
     fn code(&self, kind: &CodeKind, text: &str) -> Code {
-        let text = text.strip_suffix('\n').unwrap_or(text);
+        let text = expand_tabs(text.strip_suffix('\n').unwrap_or(text));
+        let text = text.as_str();
         let (language, label) = match kind {
             CodeKind::Fenced { info } => (fence_language(info), fence_label(info)),
             CodeKind::Indented => (None, None),
@@ -527,6 +528,31 @@ impl Reader<'_> {
         }
     }
 }
+
+fn expand_tabs(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut column = 0;
+    for c in text.chars() {
+        match c {
+            '\t' => {
+                let width = TAB_COLUMNS - column % TAB_COLUMNS;
+                out.extend(std::iter::repeat_n(' ', width));
+                column += width;
+            }
+            '\n' => {
+                out.push(c);
+                column = 0;
+            }
+            _ => {
+                out.push(c);
+                column += 1;
+            }
+        }
+    }
+    out
+}
+
+const TAB_COLUMNS: usize = 4;
 
 fn fence_language(info: &str) -> Option<Language> {
     let word = info.split_whitespace().next()?.to_ascii_lowercase();
@@ -1401,4 +1427,27 @@ pub fn foot(text: impl Into<SharedString>, theme: &Theme) -> Div {
         .mt(px(FOOT_GAP))
         .text_size(px(FONT_WHO))
         .text_color(ink(theme, FOOT_TEXT))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{markdown, pieces};
+
+    #[test]
+    fn go_fence_reaches_paint_indented_by_four_columns() {
+        let painted = pieces(&markdown(
+            "```go\nfunc main() {\n\tfmt.Println(1)\n\tif x {\n\t\ty()\n\t}\n}\n```\n\n- item\n\n  ```rust\n  fn a() {\n  \tb();\n  }\n  ```",
+        ));
+        for piece in &painted {
+            println!("paint: {piece:?}");
+        }
+        assert_eq!(
+            painted,
+            [
+                "func main() {\n    fmt.Println(1)\n    if x {\n        y()\n    }\n}",
+                "item",
+                "fn a() {\n    b();\n}",
+            ]
+        );
+    }
 }
