@@ -41,6 +41,7 @@ type Run struct {
 	Sent     Sent      `json:"sent"`
 	Labels   []Label   `json:"labels,omitempty"`
 	Said     []Said    `json:"said"`
+	Jobs     []Job     `json:"repeated_jobs,omitempty"`
 }
 
 type Known struct {
@@ -64,11 +65,13 @@ func (r Run) Find(id int) (Finding, bool) {
 }
 
 func Scan(sources []Source, known Known, at time.Time) (Run, error) {
-	said, read, err := Distil(sources)
+	sittings, read, err := readSittings(sources)
 	if err != nil {
 		return Run{}, err
 	}
-	run := Run{ID: at.Format(runStamp), At: at, Read: read, Said: said, Mode: ModeLocal}
+	heard := heardIn(sittings)
+	said, read := distil(sittings, heard, read)
+	run := Run{ID: at.Format(runStamp), At: at, Read: read, Said: said, Mode: ModeLocal, Jobs: repeatedJobs(sittings, heard)}
 	run.settle(localFindings(said, requests{}), known)
 	return run, nil
 }

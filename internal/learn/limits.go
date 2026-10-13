@@ -7,6 +7,7 @@ const (
 	HighConfidenceSessions = 3
 	SharedTellingWords     = 2
 	StrongSharedWords      = 3
+	RepeatedJobTimes       = 2
 	FixNoteWords           = 3
 	QuotedRunWords         = 5
 	SharedOfShorter        = 3

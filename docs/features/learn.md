@@ -2,7 +2,7 @@
 title: Learn
 description: tofu reads your own sessions for what keeps going wrong, tells tofu's bugs from your own rules, and proposes the fix with your words behind it.
 order: 15
-updated: 2026-10-08
+updated: 2026-10-13
 ---
 
 `tofu learn` reads your sessions when you run it and finds what you had
@@ -35,6 +35,14 @@ earlier words in it. Missing means tofu lost them.
 
 **Two sessions or it is not a pattern.** One session is watched, never
 proposed. Confidence rises with the number of sessions.
+
+**It prices the jobs you repeat.** A message you typed or a schedule
+fired, with everything done until your next message, is a job. The same
+tools in the same order for a request worded with the same three or more
+words is the same job, and a job seen twice or more is listed with its
+name, times seen, the sessions, and the cost and tokens each time and in
+total, read from every request in its window: the list of jobs worth
+writing down once.
 
 **Drafts describe, they do not quote.** An upstream draft says what
 happened in general terms, with counts, the tofu version and platform,

@@ -425,6 +425,19 @@ func scanLines(page cli.Page, run learn.Run, opts learnOpts, file string) []stri
 			lines = append(lines, "  "+clip(f.Title, learn.ShownTextRunes), "    "+page.Label(briefOf(f)))
 		}
 	}
+	jobs := run.Jobs
+	if !opts.all {
+		jobs = jobs[:min(len(jobs), learn.ProposalCap)]
+	}
+	lines = append(lines, "", page.Subject("Repeated jobs")+page.Label(fmt.Sprintf(" · %d of %d · the same tools for the same kind of request, dearest first", len(jobs), len(run.Jobs))))
+	for i, job := range jobs {
+		lines = append(lines, fmt.Sprintf("  %-2d %s", i+1, clip(job.Name, learn.ShownTextRunes)),
+			"     "+page.Label(fmt.Sprintf("%s in %s · %.4f USD each · %.4f USD total · %d tokens each", plural(job.Times, "time"), plural(len(job.Sessions), "session"), job.CostEach, job.Cost, job.TokensEach)),
+			"     "+page.Label("tools "+strings.Join(job.Tools, " > ")+" · from "+strings.Join(job.Sessions, ", ")))
+	}
+	if len(run.Jobs) == 0 {
+		lines = append(lines, "  no job asked for twice and done with the same tools")
+	}
 	sent := "nothing, --local"
 	switch {
 	case run.Sent.Local && !opts.local:

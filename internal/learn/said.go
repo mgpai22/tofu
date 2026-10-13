@@ -59,6 +59,7 @@ type Read struct {
 type heard struct {
 	Said
 	taken bool
+	steer bool
 	seat  int
 }
 
@@ -100,10 +101,18 @@ type spoken struct {
 	body session.MessageBody
 }
 
+type worked struct {
+	at     time.Time
+	tools  []string
+	tokens int
+	cost   float64
+}
+
 type sitting struct {
 	id, name, place string
 	store           *session.Store
 	spoken          []spoken
+	worked          []worked
 	requests        []session.Exchange
 }
 
@@ -137,16 +146,29 @@ func readSitting(store *session.Store, header session.Header, read *Read) (sitti
 	}
 	one := sitting{id: header.ID, name: cmp.Or(header.Named(), header.ID), store: store, requests: slices.DeleteFunc(exchanges, func(e session.Exchange) bool { return e.Agent != "" })}
 	for _, event := range events {
+		lead := event.Agent == ""
 		var body session.MessageBody
-		if event.Agent == "" && event.Kind == session.EventToolCall {
+		var call session.CallBody
+		var step session.StepBody
+		switch {
+		case event.Kind == session.EventToolCall && lead:
 			read.Calls++
-		}
-		if event.Agent != "" || event.Kind != session.EventMessage || json.Unmarshal(event.Body, &body) != nil {
-			continue
-		}
-		one.spoken = append(one.spoken, spoken{at: event.At, body: body})
-		if body.Origin == originReport {
-			read.Reports++
+			if json.Unmarshal(event.Body, &call) == nil {
+				one.worked = append(one.worked, worked{at: event.At, tools: []string{call.Tool}})
+			}
+		case (event.Kind == session.EventRequest || event.Kind == session.EventStep) && json.Unmarshal(event.Body, &step) == nil:
+			spent := worked{at: event.At, tokens: step.PromptTokens + step.CompletionTokens + step.CacheReadTokens + step.CacheWriteTokens, cost: step.CostUSD}
+			for _, stepCall := range step.ToolCalls {
+				if lead {
+					spent.tools = append(spent.tools, stepCall.Tool)
+				}
+			}
+			one.worked = append(one.worked, spent)
+		case event.Kind == session.EventMessage && lead && json.Unmarshal(event.Body, &body) == nil:
+			one.spoken = append(one.spoken, spoken{at: event.At, body: body})
+			if body.Origin == originReport {
+				read.Reports++
+			}
 		}
 	}
 	read.Sessions = append(read.Sessions, one.name)
@@ -156,11 +178,7 @@ func readSitting(store *session.Store, header session.Header, read *Read) (sitti
 	return one, nil
 }
 
-func Distil(sources []Source) ([]Said, Read, error) {
-	sittings, read, err := readSittings(sources)
-	if err != nil {
-		return nil, Read{}, err
-	}
+func heardIn(sittings []sitting) []heard {
 	var wrapped []string
 	for _, s := range sittings {
 		for _, one := range s.spoken {
@@ -178,13 +196,18 @@ func Distil(sources []Source) ([]Said, Read, error) {
 			if one.body.Role != session.RoleUser || !slices.Contains([]string{originTyped, originSteer, originTask}, one.body.Origin) {
 				continue
 			}
-			found := heard{Said: Said{Session: s.name, Place: s.place, id: s.id, store: s.store, At: one.at, Text: redact.Redact(wordsOf(one.body.Content, wrapped))}, seat: seat}
+			found := heard{Said: Said{Session: s.name, Place: s.place, id: s.id, store: s.store, At: one.at, Text: redact.Redact(wordsOf(one.body.Content, wrapped))}, seat: seat, steer: one.body.Origin == originSteer}
 			if one.body.TakenAt != nil {
 				found.At, found.taken = *one.body.TakenAt, true
 			}
 			all = append(all, found)
 		}
 	}
+	return all
+}
+
+func distil(sittings []sitting, all []heard, read Read) ([]Said, Read) {
+	redact := sys.LoadKeyRedactor()
 	kept, repeated := firstOfEach(all)
 	read.Repeated, read.Typed = repeated, len(kept)
 	out := make([]Said, len(kept))
@@ -199,7 +222,7 @@ func Distil(sources []Source) ([]Said, Read, error) {
 	if len(out) > 0 {
 		read.From, read.To = out[0].At, out[len(out)-1].At
 	}
-	return out, read, nil
+	return out, read
 }
 
 func wordsOf(raw string, wrapped []string) string {

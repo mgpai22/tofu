@@ -1,0 +1,58 @@
+{
+  "start": "2026-10-05T09:00:00Z",
+  "wrapper": "<env>\nworking directory: /home/sample/shop\nplatform: linux/amd64\n</env>\n\ninstructions from this project's AGENTS.md:\nKeep the checks passing.\n\n",
+  "sessions": [
+    {"name": "sample-mon", "day": 0, "turns": [
+      {"minute": 0, "origin": "typed by the person", "wrapped": true, "job": "release", "said": "cut the release: bump the version, update the changelog and run the checks",
+       "steps": [{"tools": ["read", "edit"], "tokens": 31000, "cost": 0.0210}, {"tools": ["bash"], "tokens": 18000, "cost": 0.0120}]},
+      {"minute": 4, "origin": "steer", "said": "also check the changelog date",
+       "steps": [{"tools": ["bash"], "tokens": 9000, "cost": 0.0060}]},
+      {"minute": 20, "origin": "typed by the person", "said": "fix the typo in the readme heading",
+       "steps": [{"tools": ["read", "edit"], "tokens": 12000, "cost": 0.0080}]},
+      {"minute": 30, "origin": "typed by the person", "said": "why did you stop? keep working",
+       "steps": [{"tokens": 4000, "cost": 0.0020}]}
+    ]},
+    {"name": "sample-tue", "day": 1, "turns": [
+      {"minute": 0, "origin": "task", "wrapped": true, "job": "nightly", "said": "Write the nightly report: list the failed builds and the open issues, then save it under reports.",
+       "steps": [{"tools": ["bash"], "tokens": 22000, "cost": 0.0150}, {"tools": ["read"], "tokens": 26000, "cost": 0.0170}, {"tools": ["write"], "tokens": 14000, "cost": 0.0090}]},
+      {"minute": 15, "origin": "typed by the person", "job": "deps", "said": "update the go dependencies and run the tests",
+       "steps": [{"tools": ["bash", "edit"], "tokens": 28000, "cost": 0.0190}, {"agent": "go-dev-1", "tools": ["bash"], "tokens": 40000, "cost": 0.0300}, {"tools": ["bash"], "tokens": 16000, "cost": 0.0110}]},
+      {"minute": 40, "origin": "typed by the person", "said": "what does the release script do?",
+       "steps": [{"tools": ["read"], "tokens": 15000, "cost": 0.0100}]}
+    ]},
+    {"name": "sample-wed", "day": 2, "turns": [
+      {"minute": 0, "origin": "task", "wrapped": true, "job": "nightly", "said": "Write the nightly report: list the failed builds and the open issues, then save it under reports.",
+       "steps": [{"tools": ["bash"], "tokens": 21000, "cost": 0.0140}, {"tools": ["read"], "tokens": 27000, "cost": 0.0180}, {"tools": ["write"], "tokens": 13000, "cost": 0.0090}]},
+      {"minute": 10, "origin": "typed by the person", "job": "release", "said": "bump the version and changelog for a release, then run the checks",
+       "steps": [{"tools": ["read", "edit"], "tokens": 30000, "cost": 0.0200}, {"tools": ["bash"], "tokens": 17000, "cost": 0.0110}]},
+      {"minute": 30, "origin": "typed by the person", "said": "rename the config loader to settings loader",
+       "steps": [{"tools": ["read", "edit"], "tokens": 25000, "cost": 0.0170}]},
+      {"minute": 45, "origin": "typed by the person", "job": "flaky", "said": "rerun the flaky parser tests and fix what fails",
+       "steps": [{"tools": ["bash"], "tokens": 20000, "cost": 0.0130}, {"tools": ["edit"], "tokens": 24000, "cost": 0.0160}, {"tools": ["bash"], "tokens": 19000, "cost": 0.0130}]}
+    ]},
+    {"name": "sample-thu", "day": 3, "turns": [
+      {"minute": 0, "origin": "task", "wrapped": true, "job": "nightly", "said": "Write the nightly report: list the failed builds and the open issues, then save it under reports.",
+       "steps": [{"tools": ["bash", "bash"], "tokens": 23000, "cost": 0.0150}, {"tools": ["read"], "tokens": 25000, "cost": 0.0170}, {"tools": ["write"], "tokens": 14000, "cost": 0.0090}]},
+      {"minute": 10, "origin": "typed by the person", "job": "deps", "said": "update dependencies, then run the test suite",
+       "steps": [{"tools": ["bash"], "tokens": 15000, "cost": 0.0100}, {"tools": ["edit"], "tokens": 21000, "cost": 0.0140}, {"tools": ["bash"], "tokens": 16000, "cost": 0.0110}]},
+      {"minute": 30, "origin": "typed by the person", "job": "review", "said": "review the open pull request and leave notes",
+       "steps": [{"tools": ["bash"], "tokens": 18000, "cost": 0.0120}, {"tools": ["read"], "tokens": 35000, "cost": 0.0230}, {"tools": ["write"], "tokens": 12000, "cost": 0.0080}]},
+      {"minute": 50, "origin": "typed by the person", "job": "flaky", "said": "the parser tests are flaky again, rerun them and fix the failure",
+       "steps": [{"tools": ["bash", "bash"], "tokens": 22000, "cost": 0.0150}, {"tools": ["edit"], "tokens": 23000, "cost": 0.0150}, {"tools": ["bash"], "tokens": 18000, "cost": 0.0120}]},
+      {"minute": 65, "origin": "typed by the person", "said": "why did you stop? keep working",
+       "steps": [{"tokens": 4000, "cost": 0.0020}]}
+    ]},
+    {"name": "sample-fri", "day": 4, "turns": [
+      {"minute": 0, "origin": "task", "wrapped": true, "job": "nightly", "said": "Write the nightly report: list the failed builds and the open issues, then save it under reports.",
+       "steps": [{"tools": ["bash"], "tokens": 22000, "cost": 0.0150}, {"tools": ["read"], "tokens": 26000, "cost": 0.0170}, {"tools": ["write"], "tokens": 14000, "cost": 0.0090}]},
+      {"minute": 10, "origin": "typed by the person", "job": "release", "said": "release again: version bump, changelog, checks",
+       "steps": [{"tools": ["read"], "tokens": 14000, "cost": 0.0090}, {"tools": ["edit"], "tokens": 17000, "cost": 0.0110}, {"tools": ["bash"], "tokens": 18000, "cost": 0.0120}]},
+      {"minute": 30, "origin": "typed by the person", "job": "review", "said": "review the open pull request, leave notes on it",
+       "steps": [{"tools": ["bash"], "tokens": 18000, "cost": 0.0120}, {"tools": ["read"], "tokens": 30000, "cost": 0.0200}, {"tools": ["grep"], "tokens": 9000, "cost": 0.0060}, {"tools": ["read"], "tokens": 20000, "cost": 0.0130}, {"tools": ["write"], "tokens": 12000, "cost": 0.0080}]},
+      {"minute": 50, "origin": "typed by the person", "said": "add a test for the empty config file",
+       "steps": [{"tools": ["read"], "tokens": 16000, "cost": 0.0110}, {"tools": ["edit"], "tokens": 19000, "cost": 0.0130}, {"tools": ["bash"], "tokens": 15000, "cost": 0.0100}]},
+      {"minute": 65, "origin": "typed by the person", "said": "fix the lint warnings in the parser",
+       "steps": [{"tools": ["bash"], "tokens": 14000, "cost": 0.0090}, {"tools": ["edit"], "tokens": 18000, "cost": 0.0120}, {"tools": ["bash"], "tokens": 13000, "cost": 0.0090}]}
+    ]}
+  ]
+}
