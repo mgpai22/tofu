@@ -10,6 +10,14 @@ The minor number carries breaking changes, which is what 0.x means, and **there 
 
 ## Unreleased
 
+## 0.5.13-fix1 - 2026-10-13
+
+A sub-agent's plan stays its own.
+
+### Fixed
+
+- A sub-agent that sets a plan no longer replaces the lead's: each sub-agent keeps its own plan, the lead's requests carry the lead's, and a sub-agent sees its own plan before each of its steps under `planEveryStep`.
+
 ## 0.5.13 - 2026-10-13
 
 A longer context, a plan before every step, and sub-agents that report together.
