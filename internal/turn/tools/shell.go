@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"tofu/internal/konst"
@@ -21,15 +22,16 @@ func (Shells) Definition() llm.Tool {
 	return llm.Tool{
 		Name: turn.ShellToolName,
 		Description: fmt.Sprintf("controls a process bash kept running, by the name that call returned, such as bash-1: a background: true start, or a command bash moved to a background shell because it was still running. "+
-			"wait returns as soon as it ends, or after %d ms, with whether it is still running, its exit code and its last lines: call it again to keep waiting on a long build, never sleep in bash. "+
+			"wait returns as soon as it ends, as soon as its last lines hold the until text, or after %d s, with whether it is still running, its exit code and its last lines: one wait covers a long build, never sleep in bash. "+
 			"logs returns the last lines it printed now, and the end of a log file its command names, such as -Log build.log or > build.log. "+
 			"stop kills its whole process tree, children included, so the port it held is free when this returns. "+
-			"restart stops it and starts the same command in the same folder under the same name. never stop a server with kill, taskkill or pkill", konst.BashSoftLimitMillis),
+			"restart stops it and starts the same command in the same folder under the same name. never stop a server with kill, taskkill or pkill", konst.ShellWaitMillis/1000),
 		Parameters: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"op":   map[string]any{"type": "string", "enum": []string{"wait", "logs", "stop", "restart"}},
-				"name": map[string]any{"type": "string", "description": "the shell's name, as bash returned it"},
+				"op":    map[string]any{"type": "string", "enum": []string{"wait", "logs", "stop", "restart"}},
+				"name":  map[string]any{"type": "string", "description": "the shell's name, as bash returned it"},
+				"until": map[string]any{"type": "string", "description": "only for wait: text the command prints once the thing waited for is ready, such as Listening on, so a server that never exits ends the wait"},
 			},
 			"required": []string{"op", "name"},
 		},
@@ -38,8 +40,9 @@ func (Shells) Definition() llm.Tool {
 
 func (Shells) Run(ctx context.Context, raw json.RawMessage) (turn.Result, error) {
 	var args struct {
-		Op   string `json:"op"`
-		Name string `json:"name"`
+		Op    string `json:"op"`
+		Name  string `json:"name"`
+		Until string `json:"until"`
 	}
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return turn.Result{}, fmt.Errorf("shell: arguments are not the expected shape: %w", err)
@@ -73,16 +76,14 @@ func (Shells) Run(ctx context.Context, raw json.RawMessage) (turn.Result, error)
 		now := time.Now()
 		return turn.Result{Content: fmt.Sprintf("%s is %s, %s. its last lines:\n%s", args.Name, entry.State, registry.Timing(entry, now).Words(now), tail), Command: command}, nil
 	case "wait":
-		ended, err := registry.AwaitEnd(ctx, args.Name, konst.BashSoftLimitMillis*time.Millisecond)
-		if err != nil {
-			return turn.Result{}, fmt.Errorf("shell: %w", err)
-		}
-		tail, err := registry.Tail(args.Name, shell.DefaultTail)
+		ended, tail, err := awaitEndOrText(ctx, registry, args.Name, args.Until)
 		if err != nil {
 			return turn.Result{}, fmt.Errorf("shell: %w", err)
 		}
 		state := args.Name + " is still running: wait again, or stop it"
 		switch {
+		case ended.State == shell.Running && args.Until != "" && strings.Contains(tail, args.Until):
+			state = fmt.Sprintf("%s printed %q and is still running", args.Name, args.Until)
 		case ended.State == shell.Killed:
 			state = args.Name + " was stopped"
 		case ended.ExitCode != nil:
@@ -94,4 +95,22 @@ func (Shells) Run(ctx context.Context, raw json.RawMessage) (turn.Result, error)
 		return turn.Result{Content: state + ", " + registry.Timing(ended, now).Words(now) + ". its last lines:\n" + tail, Command: command, ExitCode: ended.ExitCode}, nil
 	}
 	return turn.Result{}, fmt.Errorf("shell: op %q is not wait, logs, stop or restart", args.Op)
+}
+
+func awaitEndOrText(ctx context.Context, registry *shell.Registry, name, until string) (shell.Shell, string, error) {
+	deadline := time.Now().Add(konst.ShellWaitMillis * time.Millisecond)
+	for {
+		step := time.Until(deadline)
+		if until != "" {
+			step = min(step, konst.ShellWaitMatchMillis*time.Millisecond)
+		}
+		ended, err := registry.AwaitEnd(ctx, name, step)
+		if err != nil {
+			return ended, "", err
+		}
+		tail, err := registry.Tail(name, shell.DefaultTail)
+		if err != nil || ended.State != shell.Running || ctx.Err() != nil || time.Until(deadline) <= 0 || until != "" && strings.Contains(tail, until) {
+			return ended, tail, err
+		}
+	}
 }

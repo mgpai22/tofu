@@ -160,6 +160,8 @@ const (
 	BashOutputHeldBytes   = 65536
 	BackgroundYieldMillis = 10000
 	BashSoftLimitMillis   = 30000
+	ShellWaitMillis       = 300000
+	ShellWaitMatchMillis  = 1000
 	ShellNamedLogBytes    = 65536
 	ShellTailBytes        = 262144
 

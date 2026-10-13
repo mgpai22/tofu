@@ -315,6 +315,7 @@ func (a spawnArgs) mission() string {
 }
 
 func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error) {
+	timing := startSpawnTiming()
 	var args spawnArgs
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return Result{}, fmt.Errorf("spawn: arguments are not the expected shape: %w", err)
@@ -331,6 +332,7 @@ func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error
 	if err != nil {
 		return Result{}, err
 	}
+	timing.took("memory")
 	if t.writesNothing && (len(args.Owns) > 0 || args.Ticket != "") {
 		return Result{}, ReadOnlyError{Tool: t.Name()}
 	}
@@ -339,6 +341,7 @@ func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error
 			return Result{}, fmt.Errorf("spawn: %w", err)
 		}
 	}
+	timing.took("ticket grant")
 	limits := t.limits()
 	if t.depth+1 > limits.Depth {
 		return Result{}, DepthLimitError{Depth: t.depth + 1, Limit: limits.Depth}
@@ -372,6 +375,7 @@ func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error
 			args.Owns = spawning.Owns
 		}
 	}
+	timing.took("hook")
 	if err := sideHeldOwns(t.Name(), t.base.Sessions, t.base.Session, args.Owns); err != nil {
 		return Result{}, err
 	}
@@ -385,9 +389,11 @@ func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error
 			return Result{}, fmt.Errorf("spawn: %w", err)
 		}
 	}
+	timing.took("prompt")
 	if opened, err = t.open(definition, effort); err != nil {
 		return Result{}, fmt.Errorf("spawn: %w", err)
 	}
+	timing.took("account pick")
 	var recorded []string
 	if site.log != nil {
 		for _, run := range site.log.Header().Agents {
@@ -395,6 +401,7 @@ func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error
 		}
 	}
 	naming.waitForEarlier(site.call)
+	timing.took("earlier siblings")
 	t.tree.mu.Lock()
 	agent := subagent.SubAgent{
 		ID:      t.roster.NextID(definition.Name, recorded),
@@ -423,6 +430,7 @@ func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error
 		t.roster.Release(subAgentID)
 		return Result{}, fmt.Errorf("spawn: %s's scratch folder was not made: %w", subAgentID, err)
 	}
+	timing.took("scratch")
 	held := &heldSubAgent{agent: agent, definition: definition, effort: opened.Effort, askedEffort: effort, system: system,
 		environment: environment + scratchWords(scratch) + t.briefFiles(ctx, args, site.conversation),
 		boundary:    subagent.NewBoundary(subAgentID, scratch.Dir(), args.Owns), scratch: scratch, inbox: NewInbox(),
@@ -436,6 +444,8 @@ func (t *SpawnTool) Run(ctx context.Context, raw json.RawMessage) (Result, error
 	if t.SubAgents.Brief != nil {
 		task += t.SubAgents.Brief(definition, args.Task)
 	}
+	timing.took("brief")
+	site.notice(site.agent, timing.words(subAgentID))
 	started = true
 	t.Inbox.hold(held, site.log)
 	go t.background(runCtx, cancel, held, opened, site, task, warm)

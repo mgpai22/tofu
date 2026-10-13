@@ -199,6 +199,31 @@ func TestAKillByANameOnlyTofusShellsRunIsRoutedToStop(t *testing.T) {
 	}
 }
 
+func TestWaitEndsOnTheUntilTextOrACancelWhileTheCommandStillRuns(t *testing.T) {
+	registry := shell.OpenAt(filepath.Join(t.TempDir(), "shells"))
+	if _, err := registry.Start(t.TempDir(), "bash-1", "sleep 1; echo Listening on 3000; sleep 120", ""); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = registry.Kill("bash-1") })
+	ctx := turn.WithShellRegistry(context.Background(), registry)
+	began := time.Now()
+	raw, _ := json.Marshal(map[string]string{"op": "wait", "name": "bash-1", "until": "Listening on"})
+	ready, err := tools.Shells{}.Run(ctx, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if took := time.Since(began); took > 15*time.Second || !strings.Contains(ready.Content, `printed "Listening on" and is still running`) {
+		t.Fatalf("wait with until returned after %s:\n%s", took, ready.Content)
+	}
+	cancelled, cancel := context.WithCancel(ctx)
+	time.AfterFunc(time.Second, cancel)
+	began = time.Now()
+	stopped := runShell(t, cancelled, "wait", "bash-1")
+	if took := time.Since(began); took > 15*time.Second || !strings.Contains(stopped.Content, "still running") {
+		t.Fatalf("a cancelled wait returned after %s:\n%s", took, stopped.Content)
+	}
+}
+
 func TestTheShellToolNeedsARegistryAndAKnownOp(t *testing.T) {
 	raw, _ := json.Marshal(map[string]string{"op": "stop", "name": "bash-1"})
 	if _, err := (tools.Shells{}).Run(context.Background(), raw); err == nil {
