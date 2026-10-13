@@ -39,8 +39,7 @@ never do. `~/.tofu/projects.json` lists which paths own which folder. In it:
 - `shells/`: the shells an agent left running, and their logs
 
 None of this is written into the project, and tofu never deletes a session. Opening a project moves
-what older versions kept in its `.tofu` once, in one line; a clash keeps the home's file (a `log/`
-day merges both in time order, any other file keeps the old copy as `<name>.repo`).
+what older versions kept in its `.tofu` once; a clash keeps the home's file (a `log/` day merges both).
 
 A folder from before this layout, named after the whole path (`C--code-shop`), is renamed to the new
 name, instantly, the first time `tofu`, `tofu session`, `tofu serve` or `tofu run` opens the project.
