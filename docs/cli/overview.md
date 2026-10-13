@@ -87,6 +87,12 @@ tofu reload [--json]
 tofu settings [get <key> | set [--scope global|project] <key> <value>] [--json]
 ```
 
+### Scratchpad
+
+```
+tofu scratch [clean [--session X] [--cache] [--dry-run] | open] [--json]
+```
+
 ### Boards
 
 ```
