@@ -29,11 +29,15 @@ func (m Model) sheet() *sheet {
 		return s
 	}
 	kept := m.retained()
-	s := &sheet{key: key, about: about, kept: len(kept)}
+	s := &sheet{key: key, about: about}
 	for index := range about[:lead] {
 		s.drafts = append(s.drafts, draft{&about[index], about[index].ID, agentCardLines})
 	}
 	for index := range kept {
+		if m.hidden(kept[index]) {
+			continue
+		}
+		s.kept++
 		if m.shows(kept[index]) {
 			s.drafts = append(s.drafts, draft{&kept[index], kept[index].ID, (*cardCache).cardLines})
 		}

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 	"tofu/interface/tui/shells"
 	"tofu/interface/tui/subagent"
 	"tofu/internal/konst"
+	isettings "tofu/internal/settings"
 	roster "tofu/internal/subagent"
 )
 
@@ -202,6 +204,11 @@ func TestLongSessionFramesStayInsideTheBudget(t *testing.T) {
 	if want := 2 * size.calls; len(s.app.happened) < want {
 		t.Fatalf("the generated session holds %d activity events, want at least %d", len(s.app.happened), want)
 	}
+	store, err := isettings.Open(filepath.Join(t.TempDir(), "settings.json"), "")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	s.app.store = store
 	s.app.show(screenAgents)
 	began := time.Now()
 	s.app.Update(pulseMsg{})
@@ -217,6 +224,12 @@ func TestLongSessionFramesStayInsideTheBudget(t *testing.T) {
 	s.frames(t, "sub-agents, agent detail at its oldest", s.press("pgdown", "pgup"))
 	s.frames(t, "sub-agents, agents working", s.working)
 	s.frames(t, "sub-agents, thinking streams between frames", s.thinking)
+	s.app.Update(keyPress(thinkingKey))
+	if s.app.flag(isettings.ShowThinking) {
+		t.Fatalf("%s on the sub-agents screen left thinking shown", thinkingKey)
+	}
+	s.frames(t, "sub-agents, thinking hidden, streams", s.thinking)
+	s.app.Update(keyPress(thinkingKey))
 	s.app.show(screenEdits)
 	s.frames(t, "file edits, next and previous edit", s.press("n", "p"))
 	s.frames(t, "file edits, pgup/pgdown", s.press("pgup", "pgdown"))

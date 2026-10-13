@@ -172,16 +172,21 @@ func (m *Model) SetRetention(retention Retention) { m.retention = retention }
 
 func (m *Model) SetThinking(shown bool) { m.thinkingHidden = !shown }
 
+func (m Model) hidden(e Event) bool { return m.thinkingHidden && e.Kind == KindThinking }
+
 func (m Model) retained() []Event {
-	events := m.events
-	if m.thinkingHidden {
-		events = slices.DeleteFunc(slices.Clone(events), func(e Event) bool { return e.Kind == KindThinking })
-	}
 	switch m.retention {
 	case KeepAll:
-		return events
+		return m.events
 	case KeepRecent:
-		return events[max(0, len(events)-konst.FeedRecentEvents):]
+		from, kept := len(m.events), 0
+		for from > 0 && kept < konst.FeedRecentEvents {
+			from--
+			if !m.hidden(m.events[from]) {
+				kept++
+			}
+		}
+		return m.events[from:]
 	case RailOnly:
 		return nil
 	}
@@ -265,12 +270,12 @@ func (m Model) railPane(width int) string {
 }
 
 func (m Model) visible() []Event {
-	if m.filter == (identity{}) {
+	if m.filter == (identity{}) && !m.thinkingHidden {
 		return m.retained()
 	}
 	var events []Event
 	for _, e := range m.retained() {
-		if m.shows(e) {
+		if !m.hidden(e) && m.shows(e) {
 			events = append(events, e)
 		}
 	}
