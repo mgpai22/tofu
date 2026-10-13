@@ -2,12 +2,16 @@ package main
 
 import (
 	"bytes"
-	"fmt"
+	"encoding/json"
+	"errors"
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 
 	"tofu/interface/cli"
 	"tofu/internal/session"
@@ -15,7 +19,10 @@ import (
 	"tofu/internal/widget"
 )
 
-const partialSuffix = ".partial"
+const (
+	partialSuffix  = ".partial"
+	repoCopySuffix = ".repo"
+)
 
 func copyLegacyStateDirs(out io.Writer) {
 	if wd, err := os.Getwd(); err == nil {
@@ -40,7 +47,7 @@ func copyLegacyStateDir(out io.Writer, parent string) {
 		_ = page.Print(out, page.ErrorLine("the half copy "+page.Path(partial)+" was not removed: "+err.Error(), ""))
 		return
 	}
-	files, size, err := copyTreeInto(os.DirFS(source), ".", partial)
+	copied, err := copyTreeInto(os.DirFS(source), ".", partial)
 	if err == nil {
 		err = os.Rename(partial, target)
 	}
@@ -49,53 +56,77 @@ func copyLegacyStateDir(out io.Writer, parent string) {
 		_ = page.Print(out, page.ErrorLine(sys.LegacyStateDirName+" not copied to "+sys.StateDirName+", still read from "+page.Path(source)+": "+err.Error(), ""))
 		return
 	}
-	copied := strings.Join([]string{sys.LegacyStateDirName + " copied to " + sys.StateDirName, plural(countSessions(source), "session"),
-		plural(files, "file"), widget.Size(int(size)), sys.LegacyStateDirName + " kept"}, " · ")
-	_ = page.Print(out, []string{page.Receipt(cli.Added, copied, target)})
+	said := strings.Join([]string{sys.LegacyStateDirName + " copied to " + sys.StateDirName, plural(countSessions(source), "session"),
+		plural(copied.Files, "file"), widget.Size(int(copied.Bytes)), sys.LegacyStateDirName + " kept"}, " · ")
+	_ = page.Print(out, []string{page.Receipt(cli.Added, said, target)})
 }
 
-func copyTreeInto(source fs.FS, root, target string) (files int, size int64, err error) {
+type treeCopy struct {
+	Files   int      `json:"files"`
+	Bytes   int64    `json:"bytes"`
+	Settled int      `json:"settled,omitempty"`
+	Beside  []string `json:"beside,omitempty"`
+}
+
+func copyTreeInto(source fs.FS, root, target string) (copied treeCopy, err error) {
 	err = fs.WalkDir(source, root, func(name string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		path := filepath.Join(target, filepath.FromSlash(name))
+		to := filepath.Join(target, filepath.FromSlash(name))
 		if entry.IsDir() {
-			return os.MkdirAll(path, 0o755)
+			return os.MkdirAll(to, 0o755)
 		}
 		body, err := fs.ReadFile(source, name)
 		if err != nil {
 			return err
 		}
-		if err := copyFileOnce(path, body); err != nil {
+		copied.Files, copied.Bytes = copied.Files+1, copied.Bytes+int64(len(body))
+		there, err := os.ReadFile(to)
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			return sys.WriteFile(to, body, 0o644)
+		case err != nil || bytes.Equal(there, body):
 			return err
 		}
-		files, size = files+1, size+int64(len(body))
-		return nil
+		copied.Settled++
+		suffix, settled := settleConflict(name, there, body)
+		if suffix != "" {
+			copied.Beside = append(copied.Beside, name+suffix)
+		}
+		if settled == nil {
+			return nil
+		}
+		return sys.WriteFile(to+suffix, settled, 0o644)
 	})
-	return files, size, err
+	return copied, err
 }
 
-func copyFileOnce(path string, body []byte) error {
-	if there, err := os.ReadFile(path); err == nil {
-		if !bytes.Equal(there, body) {
-			return fmt.Errorf("%s is already there with other bytes", path)
+func settleConflict(name string, there, body []byte) (suffix string, settled []byte) {
+	kind, _, _ := strings.Cut(name, "/")
+	switch {
+	case name == "sessions/HEAD" || kind == "cache":
+		return "", nil
+	case kind == "log" && path.Ext(name) == ".jsonl":
+		return "", mergedLines(there, body)
+	}
+	return repoCopySuffix, body
+}
+
+func mergedLines(there, body []byte) []byte {
+	var lines []string
+	at := map[string]time.Time{}
+	for _, line := range strings.Split(string(there)+"\n"+string(body), "\n") {
+		line = strings.TrimSuffix(line, "\r")
+		if _, held := at[line]; line == "" || held {
+			continue
 		}
-		return nil
+		var stamped struct{ At time.Time }
+		_ = json.Unmarshal([]byte(line), &stamped)
+		at[line], lines = stamped.At, append(lines, line)
 	}
-	partial := path + partialSuffix
-	if err := os.WriteFile(partial, body, 0o644); err != nil {
-		return err
-	}
-	info, err := os.Stat(partial)
-	if err != nil {
-		return err
-	}
-	if info.Size() != int64(len(body)) {
-		_ = os.Remove(partial)
-		return fmt.Errorf("%s holds %d bytes after the copy, want %d", partial, info.Size(), len(body))
-	}
-	return os.Rename(partial, path)
+	slices.SortStableFunc(lines, func(a, b string) int { return at[a].Compare(at[b]) })
+	return []byte(strings.Join(lines, "\n") + "\n")
 }
 
 func countSessions(state string) int {

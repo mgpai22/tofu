@@ -90,10 +90,11 @@ func main() {
 	if opensTheApp || os.Args[1] == "migrate" {
 		copyLegacyStateDirs(os.Stderr)
 	}
-	if dir, opens := openedProject(os.Args[1:]); opens {
+	dir, opens := openedProject(os.Args[1:])
+	if opens {
 		openProject(os.Stderr, os.Stdin, dir, opensTheApp && isTerminal(os.Stdin) && isTerminal(os.Stderr))
 	}
-	if wd, err := os.Getwd(); err == nil && opensTheApp {
+	if wd, err := os.Getwd(); err == nil && (opensTheApp || opens) {
 		moveProjectState(os.Stderr, wd)
 	}
 	moveHomeKeys(os.Stderr)

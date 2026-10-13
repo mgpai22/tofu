@@ -125,7 +125,7 @@ func TestACopyInterruptedPartWayNeverBecomesTheNewDirectory(t *testing.T) {
 	target := filepath.Join(parent, sys.StateDirName)
 	partial := target + partialSuffix
 
-	if _, _, err := copyTreeInto(refusingFS{FS: os.DirFS(source), refuse: "log/decisions.jsonl"}, ".", partial); err == nil {
+	if _, err := copyTreeInto(refusingFS{FS: os.DirFS(source), refuse: "log/decisions.jsonl"}, ".", partial); err == nil {
 		t.Fatal("the copy reported success over a source it could not read whole")
 	}
 	if _, err := os.Stat(target); !os.IsNotExist(err) {
@@ -293,39 +293,62 @@ func movedAndFailed(moves []stateMove) (moved, failed int) {
 	return moved, failed
 }
 
-func TestAFileAlreadyMovedWithOtherBytesKeepsTheOldCopyAndSaysWhy(t *testing.T) {
+func TestAFileAlreadyMovedWithOtherBytesIsSettledByItsKind(t *testing.T) {
 	_, project := projectWithState(t)
 	state, err := sys.ProjectStateDirAt(project)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for path, body := range map[string]string{
-		"sessions/turn-a/header.json": `{"id":"turn-a"}`,
-		"log/decisions.jsonl":         "a row the new build wrote first\n",
-	} {
-		full := filepath.Join(state, filepath.FromSlash(path))
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
+	day := "log/2026-09-20.jsonl"
+	at := func(clock, from string) string { return `{"at":"2026-09-20T` + clock + `Z","from":"` + from + `"}` }
+	write := func(root string, files map[string]string) {
+		for path, body := range files {
+			if err := sys.WriteFile(filepath.Join(root, filepath.FromSlash(path)), []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
+	write(state, map[string]string{
+		"sessions/HEAD":               "turn-home\n",
+		"sessions/turn-a/header.json": `{"id":"turn-a","home":true}`,
+		day:                           at("10:00:00", "home") + "\n" + at("12:00:00", "both") + "\n",
+		"cache/v1-tree.json":          `{"from":"home"}`,
+	})
+	config := filepath.Join(project, sys.StateDirName)
+	write(config, map[string]string{
+		day:                  "no time here\n" + at("11:00:00", "repo") + "\r\n" + at("12:00:00", "both") + "\n" + at("13:00:00", "repo"),
+		"cache/v1-tree.json": `{"from":"repo"}`,
+	})
 
 	var out bytes.Buffer
-	moved, failed := movedAndFailed(moveProjectState(&out, project))
-	if moved != 3 || failed != 1 {
-		t.Fatalf("moved %d and failed %d, want 3 and 1:\n%s", moved, failed, out.String())
+	if moved, failed := movedAndFailed(moveProjectState(&out, project)); moved != 5 || failed != 0 {
+		t.Fatalf("moved %d and failed %d, want 5 and 0:\n%s", moved, failed, out.String())
 	}
-	old := filepath.Join(project, sys.StateDirName, "log", "decisions.jsonl")
-	if body, err := os.ReadFile(old); err != nil || string(body) != "{\"point\":\"tool_gate\"}\n" {
-		t.Fatalf("the old log was not kept whole: %q, %v", body, err)
+	got := snapshot(t, state)
+	wantLog := "no time here\n" + at("10:00:00", "home") + "\n" + at("11:00:00", "repo") + "\n" + at("12:00:00", "both") + "\n" + at("13:00:00", "repo") + "\n"
+	for name, want := range map[string]string{
+		"sessions/HEAD":                    "turn-home\n",
+		"sessions/turn-a/header.json":      `{"id":"turn-a","home":true}`,
+		"sessions/turn-a/header.json.repo": `{"id":"turn-a"}`,
+		day:                                wantLog,
+		"cache/v1-tree.json":               `{"from":"home"}`,
+	} {
+		if got[name] != want {
+			t.Errorf("%s reads %q, want %q", name, got[name], want)
+		}
 	}
-	if _, err := os.Stat(filepath.Join(project, sys.StateDirName, "sessions")); !os.IsNotExist(err) {
-		t.Fatalf("the sessions held a file already moved with the same bytes and still did not move: %v", err)
+	sameTree(t, map[string]string{
+		"agents/go-dev.md": "---\nname: go-dev\n---\n",
+		"settings.json":    `{"theme":"dark"}`,
+		".env":             "OPENROUTER_KEY=sk-or-v1-thistestwroteit\n",
+	}, snapshot(t, config), "the project's .tofu after the settled move")
+	said := out.String()
+	if !strings.HasPrefix(said, "~ moved") || strings.Count(said, "\n") != strings.Count(said, "\n  ")+1 || strings.Contains(said, "tofu migrate") || !strings.Contains(said, "4 settled") || !strings.Contains(said, "header.json.repo") {
+		t.Fatalf("the notice is not one line naming what was settled:\n%s", said)
 	}
-	if said := out.String(); !strings.Contains(said, "decisions.jsonl") || !strings.Contains(said, "tofu migrate") {
-		t.Fatalf("the notice does not name the conflict and the way out:\n%s", said)
+	var second bytes.Buffer
+	if moves := moveProjectState(&second, project); len(moves) != 0 || second.Len() != 0 {
+		t.Fatalf("the second run planned %v and said:\n%s", moves, second.String())
 	}
 }
 

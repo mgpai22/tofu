@@ -83,8 +83,12 @@ chats; `tofu session list --all` shows them. A frontend opens one over
 - **Point at one generation**: `brisk-amber-heron#4mhr1.2`; the name alone
   is the newest.
 - **Delete one**: remove its folder under `sessions/`.
-- **Move sessions an older tofu left in the project**: `tofu migrate --dry-run`,
-  then `tofu migrate`.
+- **Move sessions an older tofu left in the project**: opening the app moves
+  them once and prints one line; `tofu migrate --dry-run` lists the move
+  first. A file the home already holds with other bytes is settled by kind:
+  `sessions/HEAD` and `cache/` keep the home's, a `log/` day gains the old
+  copy's missing lines in time order, and any other file keeps the old copy
+  beside it as `<name>.repo`. The project's `settings.json` stays.
 - **Move or rename a repository**: open it in the new place. tofu knows it by
   its git remote or first commit and offers to relink its sessions; the app
   asks, and `tofu migrate --relink` accepts from the command line.

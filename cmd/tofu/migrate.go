@@ -19,11 +19,10 @@ import (
 const migrateUsage = "tofu migrate [--dry-run | --relink] [--json]"
 
 type stateMove struct {
-	Name    string `json:"name"`
-	From    string `json:"from"`
-	To      string `json:"to"`
-	Files   int    `json:"files"`
-	Bytes   int64  `json:"bytes"`
+	Name string `json:"name"`
+	From string `json:"from"`
+	To   string `json:"to"`
+	treeCopy
 	Failure string `json:"failure,omitempty"`
 }
 
@@ -74,7 +73,7 @@ func plannedStateMoves(project string) (config string, moves []stateMove, err er
 
 func moveStates(moves []stateMove) []stateMove {
 	for i, move := range moves {
-		files, size, err := copyTreeInto(os.DirFS(filepath.Dir(move.From)), move.Name, filepath.Dir(move.To))
+		copied, err := copyTreeInto(os.DirFS(filepath.Dir(move.From)), move.Name, filepath.Dir(move.To))
 		if err == nil {
 			err = os.RemoveAll(move.From)
 		}
@@ -82,7 +81,7 @@ func moveStates(moves []stateMove) []stateMove {
 			moves[i].Failure = err.Error()
 			continue
 		}
-		moves[i].Files, moves[i].Bytes = files, size
+		moves[i].treeCopy = copied
 	}
 	return moves
 }
@@ -96,22 +95,29 @@ func moveProjectState(out io.Writer, project string) []stateMove {
 	}
 	moves = moveStates(moves)
 	var names, targets []string
-	var files int
-	var size int64
+	var total treeCopy
 	var lines []string
 	for _, move := range moves {
 		if move.Failure != "" {
-			lines = append(lines, page.Glyph(cli.Warn)+" "+move.Name+" stays in "+page.Path(filepath.Dir(move.From))+": "+move.Failure+cli.Gap+page.Hint("tofu migrate"))
+			lines = append(lines, page.Glyph(cli.Warn)+" "+move.Name+" stays in "+page.Path(filepath.Dir(move.From))+": "+move.Failure)
 			continue
 		}
-		names, files, size = append(names, move.Name), files+move.Files, size+move.Bytes
+		names = append(names, move.Name)
+		total.Files, total.Bytes = total.Files+move.Files, total.Bytes+move.Bytes
+		total.Settled, total.Beside = total.Settled+move.Settled, append(total.Beside, move.Beside...)
 		if target := page.Path(filepath.Dir(move.To)); !slices.Contains(targets, target) {
 			targets = append(targets, target)
 		}
 	}
 	if len(names) > 0 {
-		moved := strings.Join([]string{"moved " + strings.Join(names, ", "), plural(files, "file"), widget.Size(int(size))}, " · ")
-		lines = append([]string{page.Glyph(cli.Changed) + " " + moved + cli.Gap + page.Label(strings.Join(targets, ", "))}, lines...)
+		moved := []string{"moved " + strings.Join(names, ", "), plural(total.Files, "file"), widget.Size(int(total.Bytes))}
+		if total.Settled > 0 {
+			moved = append(moved, strconv.Itoa(total.Settled)+" settled")
+		}
+		if len(total.Beside) > 0 {
+			moved = append(moved, "kept beside "+strings.Join(total.Beside, ", "))
+		}
+		lines = append([]string{page.Glyph(cli.Changed) + " " + strings.Join(moved, " · ") + cli.Gap + page.Label(strings.Join(targets, ", "))}, lines...)
 	}
 	_ = page.Print(out, lines)
 	return moves
