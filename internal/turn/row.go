@@ -663,7 +663,7 @@ func (r *record) fork(ended, next Row, fork *Fork, at time.Time) {
 	if r == nil || !r.own {
 		return
 	}
-	into, from := session.NewEventID(), r.log.Header()
+	into, from := cmp.Or(fork.Into, session.NewEventID()), r.log.Header()
 	r.add(session.Event{Kind: session.EventTurnEnd}, ended.Summary())
 	r.note(r.log.Edit(func(header *session.Header) {
 		header.Outcome, header.Model, header.ForkedInto = ended.Outcome.String(), cmp.Or(ended.Model, header.Model), into

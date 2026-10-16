@@ -89,6 +89,7 @@ func AnswerHostTool(id string, answer ToolCallAnswer) bool {
 	waited.(chan ToolCallAnswer) <- answer
 	return true
 }
+
 type hostTool struct {
 	def    HostToolDef
 	caller HostCaller

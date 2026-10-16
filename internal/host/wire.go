@@ -640,6 +640,7 @@ type SessionOpenParams struct {
 	Session string     `json:"session,omitempty"`
 	Asking  AskingMode `json:"asking,omitempty"`
 	Replay  *int       `json:"replay,omitempty"`
+	Beside  bool       `json:"beside,omitempty"`
 }
 
 type SessionHistoryParams struct {

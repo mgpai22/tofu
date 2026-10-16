@@ -706,6 +706,9 @@ func (e *appEngine) Renew() {
 }
 
 func (e *appEngine) OneTurnPerProject() bool {
+	if e.hostOnly {
+		return false
+	}
 	return settingInt(e.dir, settingspkg.OneTurnPerProject, nil) != 0
 }
 
@@ -792,7 +795,7 @@ func (e *appEngine) Prepare(start host.Turn, hooks host.Hooks) (host.Prepared, e
 		config.ToolSource = func() turn.Registry { return config.Tools }
 		config.ToolsOnly = true
 		config.TruncateResults = true
-		config.Gate, config.Proxy, config.Boundary, config.Sessions, config.Plan = nil, nil, nil, nil, nil
+		config.Gate, config.Proxy, config.Boundary, config.Plan = nil, nil, nil, nil
 		if _, system, registered := host.HostToolsRegistered(); registered {
 			config.System = system
 		}

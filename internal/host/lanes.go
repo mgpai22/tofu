@@ -97,7 +97,39 @@ func (s *server) lane(id string) (*lane, error) {
 	if l := s.holding(id); l != nil {
 		return l, nil
 	}
+	if l := s.adoptFork(id); l != nil {
+		return l, nil
+	}
 	return nil, &Refusal{Code: CodeRefused, Message: "session " + strconv.Quote(id) + " is not open here, and " + strconv.Quote(s.focus().host.ID()) + " is in focus: open it first"}
+}
+
+// adoptFork moves an idle lane onto id when its session ended by forking into
+// id (as an automatic compaction does). The lane's events already follow the
+// fork; without this the host keeps the old session and the forked id stays
+// unreachable until it is opened again.
+func (s *server) adoptFork(id string) *lane {
+	store, err := session.OpenIn(s.Host.dir)
+	if err != nil {
+		return nil
+	}
+	for _, l := range s.tracked() {
+		if l.running() {
+			continue
+		}
+		header, err := store.Header(l.host.ID())
+		if err != nil || header.ForkedInto != id {
+			continue
+		}
+		carry, err := s.Carry(id)
+		if err != nil {
+			return nil
+		}
+		if _, err := l.host.Resume(carry); err != nil {
+			return nil
+		}
+		return l
+	}
+	return nil
 }
 
 func (s *server) open(p SessionOpenParams) (any, error) {
@@ -108,10 +140,11 @@ func (s *server) open(p SessionOpenParams) (any, error) {
 		return nil, err
 	}
 	focus, held := s.focus(), s.holding(p.Session)
+	beside := held == nil && s.Spawn != nil && (focus.running() || (p.Beside && focus.host.ID() != ""))
 	switch {
 	case held != nil && held != focus:
 		return s.refocus(held, p)
-	case held == nil && s.Spawn != nil && focus.running():
+	case beside:
 		h, release := s.Spawn()
 		asking, pick := focus.host.Settings()
 		h.SetAsking(asking)
