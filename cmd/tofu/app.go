@@ -718,6 +718,7 @@ func (e *appEngine) Prepare(start host.Turn, hooks host.Hooks) (host.Prepared, e
 	opts.gateArm, opts.siftArm, opts.noInstructions, opts.noDocs = e.arms.gateArm, e.arms.siftArm, e.arms.noInstructions, e.arms.noDocs
 	opts.toolSet, opts.contextCeiling = cmp.Or(e.arms.toolSet, opts.toolSet), e.arms.contextCeiling
 	opts.noSubAgents = e.hostOnly || e.arms.noSubAgents || settingInt(e.dir, settingspkg.TurnMaySpawn, say) == 0
+	opts.noMemory = e.hostOnly
 	if e.hostOnly {
 		opts.gateArm = gateOff
 	}

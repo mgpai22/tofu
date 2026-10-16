@@ -111,8 +111,12 @@ type runOpts struct {
 	siftArm          string
 	noInstructions   bool
 	noDocs           bool
-	subAgentList     string
-	shell            turn.RunShell
+	// noMemory skips the memory block and memory tools: nothing in this
+	// mode reads them, and resolving the memory identity shells out to
+	// gh and git on every turn.
+	noMemory     bool
+	subAgentList string
+	shell        turn.RunShell
 }
 
 type runtime struct {
@@ -632,7 +636,7 @@ func composeRun(opts runOpts, built []turn.Tool, run runtime) (composedRun, erro
 	environment, files, instructions, notice := runEnvironment(opts)
 	say(notice)
 	remembered := ""
-	if opts.agent == "" && memoryOn(cmp.Or(opts.dir, ".")) {
+	if opts.agent == "" && !opts.noMemory && memoryOn(cmp.Or(opts.dir, ".")) {
 		block, unread := memory.Block(cmp.Or(opts.dir, "."))
 		if unread != nil {
 			say("your memory is not sent this turn: " + unread.Error())
@@ -772,7 +776,7 @@ func runConfig(opts runOpts, built []turn.Tool, run runtime) (turn.Config, *turn
 	if run.leadAsks != nil {
 		asking = append(asking, askPersonTool(dir, run.leadAsks, config.Inbox, run.notify))
 	}
-	if run.sessions != nil && memoryOn(dir) {
+	if run.sessions != nil && !opts.noMemory && memoryOn(dir) {
 		asking = append(asking, tools.Remember{Store: run.sessions, Session: sessionID, Project: dir, Inbox: config.Inbox, Judge: memoryScopeJudge(dir, run.notify),
 			Auto: func() bool { on, _ := appSetting(dir, settingspkg.AutoMemory); return on != 0 }})
 	}
@@ -805,7 +809,7 @@ func runConfig(opts runOpts, built []turn.Tool, run runtime) (turn.Config, *turn
 	spawner := turn.NewSpawnTool(orchestratorID, subAgentBase, cmp.Or(run.roster, &subagent.Roster{}))
 	spawner.Inbox, spawner.SubAgents, spawner.Project, spawner.ChecksWork = config.Inbox, prompt.subAgents, dir, prompt.checksWork
 	spawner.SubAgents.Open = run.subAgentOpener(opts)
-	if opts.agent == "" && memoryOn(dir) {
+	if opts.agent == "" && !opts.noMemory && memoryOn(dir) {
 		spawner.Remembered = func() (map[string]string, error) {
 			shelves, err := memory.Open(dir)
 			lines := map[string]string{}
