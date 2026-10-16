@@ -119,7 +119,10 @@ const (
 )
 
 const (
-	LongLivedGCPercent        = 200
+	// LongLivedGCPercent paces the collector for serve and interactive
+	// use: 100 keeps a many-session server near 50 MiB where 200 lets
+	// garbage sit past 60, for little extra GC CPU.
+	LongLivedGCPercent        = 100
 	LongLivedMemoryLimitBytes = 512 * 1024 * 1024
 )
 
