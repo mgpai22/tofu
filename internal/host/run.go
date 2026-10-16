@@ -56,6 +56,7 @@ type Hooks struct {
 	Inbox    *turn.Inbox
 	Reads    *turn.ReadLedger
 	Cron     *cron.Book
+	HostTool HostCaller
 }
 
 type Prepared struct {
@@ -126,6 +127,9 @@ func (h *Host) run(ctx context.Context, pick Pick, task string, live Live) {
 		Inbox:  h.inbox,
 		Reads:  h.reads,
 		Cron:   h.cron,
+		HostTool: func(ctx context.Context, tool string, args json.RawMessage) (ToolCallAnswer, error) {
+			return WaitHostTool(ctx, emit, tool, args)
+		},
 	})
 	if prepared.Close != nil {
 		defer prepared.Close()

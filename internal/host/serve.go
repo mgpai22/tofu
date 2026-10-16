@@ -184,6 +184,8 @@ func (s *server) call(method string, raw json.RawMessage) (any, error) {
 	switch method {
 	case "initialize":
 		return handle(raw, s.initialize)
+	case "tools.register":
+		return handle(raw, s.registerTools)
 	case "session.list":
 		return handle(raw, s.sessions)
 	case "session.state":
@@ -281,6 +283,16 @@ func (s *server) initialize(p InitializeParams) (any, error) {
 	s.client, s.ready, s.answers = p.Client, true, slices.Contains(p.Capabilities, "questions")
 	s.mu.Unlock()
 	return InitializeResult{Protocol: Protocol, Tofu: konst.Version, Project: s.Dir, Capabilities: capabilities()}, nil
+}
+
+func (s *server) registerTools(p ToolsRegisterParams) (any, error) {
+	for _, tool := range p.Tools {
+		if strings.TrimSpace(tool.Name) == "" {
+			return nil, &Refusal{Code: CodeBadParams, Message: "every hosted tool needs a name"}
+		}
+	}
+	RegisterHostTools(p.Tools, p.System)
+	return Ack{OK: true}, nil
 }
 
 func (s *server) history(p SessionHistoryParams) (any, error) {
@@ -502,6 +514,16 @@ func (s *server) shellKill(p ShellParams) (any, error) {
 func (s *server) answered(id, result json.RawMessage) error {
 	var approval string
 	_ = json.Unmarshal(id, &approval)
+	if HasHostToolWaiter(approval) {
+		var answer ToolCallAnswer
+		if json.Unmarshal(result, &answer) != nil {
+			return &Refusal{Code: CodeBadParams, Message: "tool call " + approval + " takes an answer of {allowed, result}"}
+		}
+		if !AnswerHostTool(approval, answer) {
+			return &Refusal{Code: CodeInvalid, Message: "tool call " + approval + " was withdrawn before this answer arrived"}
+		}
+		return nil
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	lanes := s.tracked()

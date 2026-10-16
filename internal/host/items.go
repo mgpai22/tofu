@@ -229,6 +229,11 @@ func (s *items) translate(event Event, now time.Time) []outgoing {
 		spent := *event.Account
 		spent.Identity = s.identity(event.Agent, s.mint("account"))
 		return append(out, kept("turn.account", &spent))
+	case EventHostTool:
+		asked := ToolCallRequest{Identity: id, Call: event.ID, Tool: event.Tool, Args: wholeJSON(event.Args)}
+		request := kept(ToolCallMethod, &asked)
+		request.msg.ID, _ = json.Marshal(event.ID)
+		return append(out, request)
 	case EventForkStart, EventResumed, EventRequesting:
 		return out
 	}

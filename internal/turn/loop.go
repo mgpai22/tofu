@@ -56,7 +56,7 @@ func Run(ctx context.Context, config Config) (Row, error) {
 	if config.Model == nil && config.Accounts.Pick == nil {
 		return Row{}, errors.New("turn: no model")
 	}
-	if strings.TrimSpace(config.Task) == "" {
+	if strings.TrimSpace(config.Task) == "" && !config.Continue {
 		return Row{}, errors.New("turn: no task")
 	}
 	if config.ResultBytesCap <= 0 {
@@ -100,6 +100,9 @@ func Run(ctx context.Context, config Config) (Row, error) {
 	personAnswers := config.Person != nil && config.SpawnedFrom == "" && !strings.HasPrefix(config.TaskOrigin.Source, cronTaskSource)
 	unoffered := func(name string) bool { return !personAnswers && name == AskPersonToolName }
 	withLoopTools := func(tools []Tool) []Tool {
+		if config.ToolsOnly {
+			return slices.Clone(tools)
+		}
 		added := slices.Clone(tools)
 		for _, tool := range tools {
 			if spawner, spawning := tool.(*SpawnTool); spawning {
@@ -276,14 +279,18 @@ func Run(ctx context.Context, config Config) (Row, error) {
 		prompted := fire(ctx, hook.Input{Event: hook.UserPromptSubmit, Prompt: config.Task})
 		promptRefused, hookContext = prompted.Block, strings.TrimSpace(hookContext+"\n\n"+prompted.Context)
 	}
-	first := config.FirstUserMessage(concluding+taken, hookContext)
 	taskOrigin, taskSource := config.TaskOrigin, sourceTask
 	if config.SpawnedFrom != "" {
 		taskSource = sourceBrief
 	}
-	taskOrigin.Source, taskOrigin.TakenAt = cmp.Or(taskOrigin.Source, taskSource), start
-	messages = append(messages, llm.Message{Role: llm.RoleUser, Content: first, Images: config.Images, Origin: taskOrigin})
-	episode(episodeKind(taskOrigin.Source), config.Task)
+	if config.Continue && len(config.History) > 0 {
+		episode(episodeKind(taskOrigin.Source), config.Task)
+	} else {
+		first := config.FirstUserMessage(concluding+taken, hookContext)
+		taskOrigin.Source, taskOrigin.TakenAt = cmp.Or(taskOrigin.Source, taskSource), start
+		messages = append(messages, llm.Message{Role: llm.RoleUser, Content: first, Images: config.Images, Origin: taskOrigin})
+		episode(episodeKind(taskOrigin.Source), config.Task)
+	}
 
 	var written, shadowed sync.WaitGroup
 	var shadows sync.Mutex

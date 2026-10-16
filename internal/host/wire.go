@@ -1084,6 +1084,7 @@ func notifications() []method {
 func requests() []method {
 	methods := []method{
 		{name: "initialize", params: InitializeParams{}, result: InitializeResult{}},
+		{name: "tools.register", params: ToolsRegisterParams{}, result: Ack{}},
 		{name: "session.list", params: SessionListParams{}, result: SessionList{}},
 		{name: "session.open", params: SessionOpenParams{}, result: SessionOpenResult{}},
 		{name: "session.close", params: SessionCloseParams{}, result: Ack{}},
@@ -1164,7 +1165,7 @@ func requests() []method {
 
 func capabilities() []string {
 	return []string{"approvals", "questions", "resync", "shells", "queries", "cron", "rename", "list", "listed", "state", "set", "wires", "images", "lead", "unsteer", "sendNow", "run", "compact", "history", "ledger",
-		"typed", "memory", "reload", "hooks", "learn", "docs", "changelog", "update", "doctor", "setup", "key", "logout", "info", "find", "trace", "accounts", "writes", "status", "mention", "boards", "side", "commands", "boardy", "scratch", "sessions"}
+		"typed", "memory", "reload", "hooks", "learn", "docs", "changelog", "update", "doctor", "setup", "key", "logout", "info", "find", "trace", "accounts", "writes", "status", "mention", "boards", "side", "commands", "boardy", "scratch", "sessions", "hosttools"}
 }
 
 const queryPrefix = "query."

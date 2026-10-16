@@ -99,6 +99,8 @@ type Config struct {
 	ResultBytesCap  int
 	ArtifactDir     string
 	TruncateResults bool
+	ToolsOnly       bool
+	Continue        bool
 	NoCompaction    bool
 	NoFork          bool
 	NoLastWord      bool

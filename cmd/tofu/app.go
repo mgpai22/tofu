@@ -587,6 +587,9 @@ type appWire struct {
 }
 
 func openAppWire(opts runOpts) (appWire, error) {
+	if os.Getenv(gatewayBaseVariable) != "" {
+		return gatewayWire(opts)
+	}
 	selected, err := chooseModel(opts)
 	if err != nil {
 		return appWire{}, err
@@ -688,11 +691,12 @@ func pickedOpts(dir string, start host.Turn, maxSteps int) runOpts {
 }
 
 type appEngine struct {
-	dir  string
-	arms runOpts
-	open func(runOpts) (appWire, error)
-	tabs *tools.BrowserTabs
-	warm *warmProcesses
+	dir      string
+	arms     runOpts
+	open     func(runOpts) (appWire, error)
+	tabs     *tools.BrowserTabs
+	warm     *warmProcesses
+	hostOnly bool
 }
 
 func (e *appEngine) Renew() {
@@ -710,7 +714,10 @@ func (e *appEngine) Prepare(start host.Turn, hooks host.Hooks) (host.Prepared, e
 	opts := pickedOpts(e.dir, start, cmp.Or(e.arms.maxSteps, settingInt(e.dir, settingspkg.DecisionCap, say)))
 	opts.gateArm, opts.siftArm, opts.noInstructions, opts.noDocs = e.arms.gateArm, e.arms.siftArm, e.arms.noInstructions, e.arms.noDocs
 	opts.toolSet, opts.contextCeiling = cmp.Or(e.arms.toolSet, opts.toolSet), e.arms.contextCeiling
-	opts.noSubAgents = e.arms.noSubAgents || settingInt(e.dir, settingspkg.TurnMaySpawn, say) == 0
+	opts.noSubAgents = e.hostOnly || e.arms.noSubAgents || settingInt(e.dir, settingspkg.TurnMaySpawn, say) == 0
+	if e.hostOnly {
+		opts.gateArm = gateOff
+	}
 	opts.readBeforeEdit = settingInt(e.dir, settingspkg.ReadBeforeEdit, say) != 0
 	opts.planEveryStep = settingInt(e.dir, settingspkg.PlanEveryStep, say) != 0
 	prepared := host.Prepared{MaxSteps: opts.maxSteps}
@@ -778,6 +785,22 @@ func (e *appEngine) Prepare(start host.Turn, hooks host.Hooks) (host.Prepared, e
 	if gate != nil {
 		gate.watch = hooks.Gate
 		prepared.Decisions = func() int { return gate.decisions }
+	}
+	if e.hostOnly && hooks.HostTool != nil {
+		hosted := host.MakeHostTools(hooks.HostTool)
+		config.Tools = turn.NewRegistry(hosted...)
+		config.ToolSource = func() turn.Registry { return config.Tools }
+		config.ToolsOnly = true
+		config.TruncateResults = true
+		config.Gate, config.Proxy, config.Boundary, config.Sessions, config.Plan = nil, nil, nil, nil, nil
+		if _, system, registered := host.HostToolsRegistered(); registered {
+			config.System = system
+		}
+		config.Instructions, config.Environment, config.Memory = "", "", ""
+		spawner = nil
+		if strings.TrimSpace(start.Task) == "" {
+			config.Continue = true
+		}
 	}
 	config.Images = images
 	config.Person = person.Asking(config.GatePromptAsks)

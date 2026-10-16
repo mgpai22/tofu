@@ -23,7 +23,7 @@ import (
 	"tofu/internal/turn"
 )
 
-const serveUsage = `usage: tofu serve --stdio [--dir PATH] [--cassette PATH]
+const serveUsage = `usage: tofu serve --stdio [--dir PATH] [--cassette PATH] [--host-tools-only]
        tofu serve --schema
 
 serves one project to a frontend over standard input and output: JSON-RPC 2.0,
@@ -39,6 +39,12 @@ TOFU_DRIVE_CASSETTE names it when --cassette does not. A cassette run reads
 no quota, unless TOFU_CLAUDE_USAGE_URL or TOFU_CODEX_USAGE_URL names a
 stand-in usage endpoint, which it then polls for quota.updated and
 account.state.
+
+--host-tools-only hides every built-in tool and the tool gate: the model only
+sees the tools a client registers with tools.register, and every call blocks
+on the client's answer to tofu/callTool. TOFU_GATEWAY_BASE names an Anthropic
+Messages endpoint used with TOFU_GATEWAY_KEY, TOFU_GATEWAY_MODEL and optional
+JSON TOFU_GATEWAY_HEADERS.
 `
 
 const percentOfOne = 100
@@ -46,6 +52,7 @@ const percentOfOne = 100
 type servePlan struct {
 	stdio    bool
 	schema   bool
+	hostOnly bool
 	dir      string
 	cassette string
 }
@@ -58,6 +65,8 @@ func serveArgs(args []string) (servePlan, error) {
 		switch {
 		case args[index] == "--stdio":
 			plan.stdio = true
+		case args[index] == "--host-tools-only":
+			plan.hostOnly = true
 		case args[index] == "--schema":
 			plan.schema = true
 		case !takesValue:
@@ -131,7 +140,7 @@ func serveVerb(args []string, in io.Reader, out, errOut io.Writer) int {
 	say("speaking " + host.Protocol + " for " + dir)
 	var projectTurn sync.Mutex
 	spawn := func() (*host.Host, func()) {
-		engine := &appEngine{dir: dir, open: open, tabs: launch.tabs}
+		engine := &appEngine{dir: dir, open: open, tabs: launch.tabs, hostOnly: plan.hostOnly}
 		live, troubles := host.New(host.Config{Dir: dir, Engine: engine, Shells: launch.registry, Check: cronChecker(dir), ProjectTurn: &projectTurn})
 		for _, trouble := range troubles {
 			say(trouble)
