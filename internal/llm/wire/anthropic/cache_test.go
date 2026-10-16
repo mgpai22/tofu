@@ -47,6 +47,18 @@ func TestACommittedPrefixUnderTheMinimumGetsNoSecondBreakpoint(t *testing.T) {
 	}
 }
 
+// gate: short driver conversations still mark the tip when the far end adds its own prefix
+func TestAnyLengthMarksAShortConversationTip(t *testing.T) {
+	request := minimalRequest()
+	request.Messages = append(request.Messages, exchange(1, "a short first result")...)
+	request.HistoryCacheAnyLength = true
+
+	indexes := messageBreakpoints(t, request)
+	if len(indexes) != 1 || indexes[0] != len(request.Messages)-1 {
+		t.Fatalf("a short conversation with any-length caching broke the cache at %v, want the tip", indexes)
+	}
+}
+
 func TestALongConversationStaysInsideTheBreakpointAllowance(t *testing.T) {
 	request := historyRequest(40)
 	request.System = []string{"the project instructions"}

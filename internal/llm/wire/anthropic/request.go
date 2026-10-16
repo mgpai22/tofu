@@ -30,12 +30,16 @@ type Request struct {
 	UserID     string
 	CacheTTL   string
 
-	ClaudeCodeVersion   string
-	HistoryCacheOff     bool
-	OmitThinkingSummary bool
-	OnDelta             func(string)
-	OnThinking          func(string)
-	OnRetry             func()
+	ClaudeCodeVersion string
+	HistoryCacheOff   bool
+	// HistoryCacheAnyLength marks the conversation even under the length
+	// floors: a proxy may add its own prefix, so only the far end knows
+	// whether the marked prefix reaches the vendor's cacheable minimum.
+	HistoryCacheAnyLength bool
+	OmitThinkingSummary   bool
+	OnDelta               func(string)
+	OnThinking            func(string)
+	OnRetry               func()
 }
 
 const SourceAfterTheCachedPrefix = "after the cached prefix"
@@ -169,7 +173,7 @@ func (r Request) Encode(oauth bool) ([]byte, error) {
 		}
 	}
 	if !r.HistoryCacheOff {
-		applyHistoryCaching(history, r.CacheTTL, cacheBreakpointsPerRequest-head)
+		applyHistoryCaching(history, r.CacheTTL, cacheBreakpointsPerRequest-head, r.HistoryCacheAnyLength)
 	}
 
 	userID, err := metadataUserID(r, oauth)
@@ -296,13 +300,17 @@ func opensOnStandingContext(messages []wireMessage) bool {
 	return len(messages) > 1 && messages[0].Role == "user" && messages[1].Role == "user"
 }
 
-func applyHistoryCaching(messages []wireMessage, ttl string, budget int) {
-	if budget < 1 || historyChars(messages) < historyCacheMinPrefixChars {
+func applyHistoryCaching(messages []wireMessage, ttl string, budget int, anyLength bool) {
+	tipFloor, committedFloor := historyCacheMinPrefixChars, historyCacheCommittedMinChars
+	if anyLength {
+		tipFloor, committedFloor = 0, 0
+	}
+	if budget < 1 || len(messages) == 0 || historyChars(messages) < tipFloor {
 		return
 	}
 	markPrefixEnd(messages[len(messages)-1].Content, ttl)
 	committed := committedPrefixEnd(messages)
-	if budget < 2 || committed < 1 || historyChars(messages[:committed+1]) < historyCacheCommittedMinChars {
+	if budget < 2 || committed < 1 || historyChars(messages[:committed+1]) < committedFloor {
 		return
 	}
 	markPrefixEnd(messages[committed].Content, ttl)

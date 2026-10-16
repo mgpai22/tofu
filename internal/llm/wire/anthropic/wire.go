@@ -90,6 +90,9 @@ func (w *Wire) Ask(ctx context.Context, request Request) (Result, Dump, error) {
 	request.SessionID = cmp.Or(request.SessionID, w.config.SessionID)
 	request.AccountID = cmp.Or(request.AccountID, w.config.AccountID)
 	request.InstallID = cmp.Or(request.InstallID, w.config.InstallID)
+	// Through a proxy the far end owns the cacheable prefix, so tofu
+	// cannot judge the length floors itself: always mark the tip.
+	request.HistoryCacheAnyLength = request.HistoryCacheAnyLength || w.config.Proxy
 
 	token, err := w.config.Token(ctx, "")
 	if err != nil {

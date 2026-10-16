@@ -314,7 +314,8 @@ func TestTwoSessionsInOneProjectSendTheSameCachedPrefix(t *testing.T) {
 		}
 		bodies = append(bodies, server.bodies[0])
 	}
-	assertCachedPrefixCarriesOver(t, inCacheOrder(t, bodies[0]), inCacheOrder(t, bodies[1]))
+	// The two tasks differ, so each session marks its own tail tip; only the shared head can carry over.
+	assertCachedPrefixCarriesOver(t, headOf(inCacheOrder(t, bodies[0])), headOf(inCacheOrder(t, bodies[1])))
 }
 
 const subAgentInstructions = "you write typescript for bun and hono"
